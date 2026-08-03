@@ -1,0 +1,18 @@
+# Hệ điều hành
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Trình soạn thảo
+.vscode/
+.idea/
+*.swp
+
+# Node (nếu dùng npx serve)
+node_modules/
+package-lock.json
+
+# Nhật ký
+*.log

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="night">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#07061a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="description" content="Một món quà nhỏ anh làm riêng cho em — chạm vào để thắp nến 🕯️💗">
+    <meta property="og:title" content="💗 Có một điều bất ngờ dành cho em…">
+    <meta property="og:description" content="Chạm vào để thắp nến và mở món quà sinh nhật của em 💝">
+    <title>💗 Một điều bất ngờ dành cho em…</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Pacifico&family=Quicksand:wght@400;500;600;700&family=Dancing+Script:wght@600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎂</text></svg>">
+</head>
+
+<body class="locked">
+    <!-- ═══ HÀNH TRÌNH 5 MÀN: mỗi màn một nghi thức chạm ═══ -->
+    <div class="intro" id="intro">
+        <div class="intro-vignette" aria-hidden="true"></div>
+        <button class="journey-skip" id="journeySkip">Bỏ qua ⏭</button>
+        <div class="journey-dots" id="journeyDots" aria-hidden="true"></div>
+
+        <!-- ── MÀN 1: thắp nến trong bóng tối ── -->
+        <section class="scene active" id="scene1">
+            <div class="intro-inner">
+                <div class="intro-candle" id="introCandle" role="button" tabindex="0" aria-label="Thắp nến">
+                    <div class="i-glow" aria-hidden="true"></div>
+                    <div class="i-flame"></div>
+                    <div class="i-wick"></div>
+                    <div class="i-body">
+                        <span class="i-drip"></span><span class="i-drip"></span>
+                    </div>
+                    <div class="i-holder"></div>
+                </div>
+                <p class="intro-hint" id="introHint">{Anh} có thắp sẵn cho {em} một ngọn nến…<br><b>chạm vào để thắp
+                        sáng</b> 🕯️</p>
+                <div class="intro-reveal" id="introReveal" hidden>
+                    <p class="intro-eyebrow">✦ hôm nay là ngày của {em} ✦</p>
+                    <h2 class="intro-title">Chúc mừng sinh nhật<br><span id="introName">Bạn</span></h2>
+                    <button class="gate-btn" id="enterBtn">Bắt đầu hành trình →</button>
+                    <p class="gate-hint">{Em} bật loa lên nhé, {anh} có chuẩn bị nhạc 🎵</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── MÀN 2: nối các vì sao thành chòm sao trái tim ── -->
+        <section class="scene" id="scene2">
+            <canvas id="constCanvas"></canvas>
+            <p class="scene-hint" id="constHint">{Anh} đã giấu trên trời những vì sao…<br><b>chạm lần lượt để nối chúng
+                    lại</b> ⭐</p>
+            <div class="scene-done" id="constDone" hidden>
+                <h2 class="scene-title">Đó là chòm sao của chúng mình —<br>một trái tim, không thiếu ngôi nào 💗</h2>
+            </div>
+        </section>
+
+        <!-- ── MÀN 3: thả bóng bay mang điều ước ── -->
+        <section class="scene" id="scene3">
+            <div class="wish-balloons" id="wishBalloons"></div>
+            <p class="scene-hint" id="balloonHint">Mỗi quả bóng mang một chữ trong tên {em}…<br><b>chạm để thả chúng bay
+                    lên</b> 🎈</p>
+            <div class="scene-done" id="balloonDone" hidden>
+                <h2 class="scene-title" id="balloonName"></h2>
+                <p class="scene-sub">tên {em}, {anh} đã gửi lên tận trời cao 💫</p>
+            </div>
+        </section>
+
+        <!-- ── MÀN 4: kéo dải ruy băng để mở quà ── -->
+        <section class="scene" id="scene4">
+            <div class="giftbox" id="giftBox">
+                <div class="gb-burst" aria-hidden="true"></div>
+                <div class="gb-lid"></div>
+                <div class="gb-body"></div>
+                <div class="gb-ribbon-v" aria-hidden="true"></div>
+                <div class="gb-ribbon" id="giftRibbon">
+                    <span class="gb-bow">🎀</span>
+                </div>
+            </div>
+            <p class="scene-hint" id="giftHint">Món quà {anh} gói riêng cho {em}…<br><b>kéo dải ruy băng sang ngang</b>
+                🎀</p>
+            <div class="scene-done" id="giftDone" hidden>
+                <h2 class="scene-title">Bên trong không có gì đắt tiền —<br>chỉ có cả bầu trời {anh} dành cho {em} 🎁
+                </h2>
+            </div>
+        </section>
+
+        <!-- ── MÀN 5: chạm & giữ trái tim ── -->
+        <section class="scene" id="scene5">
+            <div class="heart-hold" id="heartHold" role="button" tabindex="0" aria-label="Chạm và giữ">
+                <svg class="heart-ring" viewBox="0 0 120 120" aria-hidden="true">
+                    <circle class="hr-track" cx="60" cy="60" r="54" />
+                    <circle class="hr-bar" id="heartRing" cx="60" cy="60" r="54" />
+                </svg>
+                <div class="heart-core">💗</div>
+            </div>
+            <p class="scene-hint" id="heartHint">Điều cuối cùng — trái tim {anh}, đang đập vì {em}…<br><b>chạm và giữ
+                    cho tới khi nó vỡ oà</b> 💗</p>
+            <div class="scene-done" id="heartDone" hidden>
+                <h2 class="scene-title">Tim {anh} là của {em} rồi đó 💞<br>Bữa tiệc bắt đầu thôi!</h2>
+            </div>
+        </section>
+    </div>
+
+    <!-- ═══ 2. NỀN: cực quang + sao 3 lớp parallax + sao băng ═══ -->
+    <div class="aurora" aria-hidden="true">
+        <span class="aurora-blob b1"></span>
+        <span class="aurora-blob b2"></span>
+        <span class="aurora-blob b3"></span>
+    </div>
+    <canvas id="bgCanvas" aria-hidden="true"></canvas>
+    <div class="balloons-bg" id="balloonsBg" aria-hidden="true"></div>
+    <canvas id="fxCanvas" aria-hidden="true"></canvas>
+
+    <!-- ═══ 3. THANH ĐIỀU KHIỂN ═══ -->
+    <div class="topbar">
+        <button class="icon-btn" id="musicToggle" title="Bật/tắt nhạc" aria-label="Bật tắt nhạc">🔇</button>
+        <button class="icon-btn" id="themeToggle" title="Đổi giao diện" aria-label="Đổi giao diện">🌙</button>
+        <button class="icon-btn" id="shareBtn" title="Chia sẻ trang này" aria-label="Chia sẻ">🔗</button>
+    </div>
+
+    <main class="stage" id="stage">
+
+        <!-- ═══ 4. THIỆP CHÍNH ═══ -->
+        <section class="card tilt" id="card">
+            <div class="card-glow" aria-hidden="true"></div>
+
+            <div class="balloon-row" aria-hidden="true">
+                <span class="balloon">🎈</span><span class="balloon">🎈</span>
+                <span class="balloon">🎈</span><span class="balloon">🎈</span>
+                <span class="balloon">🎈</span>
+            </div>
+
+            <p class="eyebrow">✦ Happy Birthday My Love ✦</p>
+            <h1 class="title" id="title" aria-label="Chúc Mừng Sinh Nhật"></h1>
+
+            <!-- Tên ghép từ hàng nghìn hạt sáng — di chuột để phá, tự ghép lại -->
+            <div class="name-stage">
+                <canvas id="nameCanvas" aria-label="Tên người nhận"></canvas>
+                <p class="name-hint">✨ chạm vào tên {em} thử xem ✨</p>
+            </div>
+
+            <div class="age-badge" id="ageBadge" hidden><span id="ageNum">20</span><small>tuổi</small></div>
+
+            <!-- Bánh kem + vòng ánh sáng nhảy theo nhạc -->
+            <div class="cake-wrap">
+                <div class="cake-stage">
+                    <canvas id="vizCanvas" width="320" height="320" aria-hidden="true"></canvas>
+                    <div class="cake" id="cake" role="img" aria-label="Bánh sinh nhật">
+                        <div class="candles" id="candles"></div>
+                        <div class="tier tier-top">
+                            <span class="drip"></span><span class="drip"></span><span class="drip"></span>
+                            <span class="drip"></span><span class="drip"></span>
+                        </div>
+                        <div class="tier tier-mid">
+                            <span class="drip"></span><span class="drip"></span><span class="drip"></span>
+                            <span class="drip"></span><span class="drip"></span><span class="drip"></span>
+                        </div>
+                        <div class="tier tier-bottom">
+                            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                        </div>
+                        <div class="plate"></div>
+                    </div>
+                </div>
+                <p class="cake-hint" id="cakeHint">{Em} thổi nến và ước đi, {anh} tính tới ba nhé 🕯️</p>
+            </div>
+
+            <div class="wishes">
+                <p class="wish-text" id="wishText"></p>
+                <span class="wish-caret" aria-hidden="true"></span>
+            </div>
+
+            <div class="actions">
+                <button class="btn btn-primary" id="fireworksBtn">🎆 Bắn pháo hoa</button>
+                <button class="btn" id="confettiBtn">🎊 Đại bác kim tuyến</button>
+                <button class="btn" id="blowBtn">🎤 Thổi nến bằng mic</button>
+                <button class="btn" id="surpriseBtn">✨ Bất ngờ</button>
+            </div>
+
+            <p class="micro-hint">Mẹo: bấm vào nền để bắn pháo hoa 💥 · phím F / C / B / M / S</p>
+        </section>
+
+        <!-- ═══ 5. CHÚNG MÌNH ĐÃ BÊN NHAU ═══ -->
+        <section class="panel love-panel">
+            <h3 class="panel-title">💞 Chúng mình đã bên nhau</h3>
+            <div class="countdown" id="loveCount">
+                <div class="cd-unit"><b id="lcDays">0</b><small>ngày</small></div>
+                <div class="cd-unit"><b id="lcHours">0</b><small>giờ</small></div>
+                <div class="cd-unit"><b id="lcMins">0</b><small>phút</small></div>
+                <div class="cd-unit"><b id="lcSecs">0</b><small>giây</small></div>
+            </div>
+            <p class="cd-note" id="loveNote"></p>
+            <p class="love-extra" id="loveExtra"></p>
+        </section>
+
+        <!-- ═══ 6. LÁ THƯ TAY ═══ -->
+        <section class="panel letter-panel">
+            <h3 class="panel-title">💌 Một lá thư cho {em}</h3>
+            <div class="envelope-wrap" id="envelopeWrap">
+                <div class="envelope" id="envelope" role="button" tabindex="0" aria-label="Mở thư">
+                    <div class="env-paper">💌</div>
+                    <div class="env-front"></div>
+                    <div class="env-flap"></div>
+                    <div class="env-seal">💖</div>
+                </div>
+                <p class="panel-note">Chạm vào phong bì để mở thư</p>
+            </div>
+            <div class="letter" id="letter" hidden>
+                <p class="letter-text" id="letterText"></p>
+                <p class="letter-sign" id="letterSign"></p>
+            </div>
+        </section>
+
+        <!-- ═══ 7. LÝ DO YÊU ═══ -->
+        <section class="panel reasons-panel">
+            <h3 class="panel-title">💗 Lý do {anh} yêu {em}</h3>
+            <div class="reason-card" id="reasonCard">
+                <span class="reason-num" id="reasonNum">01</span>
+                <p class="reason-text" id="reasonText"></p>
+            </div>
+            <div class="reason-actions">
+                <button class="btn btn-primary" id="reasonBtn">Một lý do nữa →</button>
+                <span class="reason-count" id="reasonCount"></span>
+            </div>
+        </section>
+
+        <!-- ═══ 8. DÒNG THỜI GIAN ═══ -->
+        <section class="panel">
+            <h3 class="panel-title">🗓️ Hành trình của chúng mình</h3>
+            <ol class="timeline" id="timeline"></ol>
+        </section>
+
+        <!-- ═══ 9. ĐẾM NGƯỢC ═══ -->
+        <section class="panel countdown-panel">
+            <h3 class="panel-title">⏳ Đếm ngược tới sinh nhật {em}</h3>
+            <div class="countdown" id="countdown">
+                <div class="cd-unit"><b id="cdDays">0</b><small>ngày</small></div>
+                <div class="cd-unit"><b id="cdHours">0</b><small>giờ</small></div>
+                <div class="cd-unit"><b id="cdMins">0</b><small>phút</small></div>
+                <div class="cd-unit"><b id="cdSecs">0</b><small>giây</small></div>
+            </div>
+            <p class="cd-note" id="cdNote"></p>
+        </section>
+
+        <!-- ═══ 10. ALBUM KỶ NIỆM ═══ -->
+        <section class="panel gallery-panel">
+            <h3 class="panel-title">📸 Album của chúng mình</h3>
+            <div class="gallery" id="gallery"></div>
+            <p class="panel-note">Thả ảnh hai đứa vào thư mục <code>photos/</code> (1.jpg, 2.jpg…) là tự hiện ra.</p>
+        </section>
+
+        <!-- ═══ 11. LỜI HỨA ═══ -->
+        <section class="panel">
+            <h3 class="panel-title">💍 Rút một lời hứa của {anh}</h3>
+            <div class="fortune-grid" id="fortuneGrid"></div>
+            <p class="panel-note">Lật từng tấm để xem {anh} hứa gì với {em} nhé</p>
+        </section>
+
+        <!-- ═══ 12. GỬI THÊM LỜI YÊU ═══ -->
+        <section class="panel">
+            <h3 class="panel-title">💌 Điều {em} muốn nói với {anh}</h3>
+            <form class="wish-form" id="wishForm">
+                <input type="text" id="wishAuthor" placeholder="Tên của {em}" maxlength="24" autocomplete="name">
+                <textarea id="wishMessage" placeholder="Viết vài dòng cho {anh} nhé…" maxlength="200" rows="2"
+                    required></textarea>
+                <button class="btn btn-primary" type="submit">Gửi cho {anh} 💝</button>
+            </form>
+            <div class="wish-wall" id="wishWall"></div>
+        </section>
+
+        <footer class="footer">
+            <p>Làm bằng 💖 — chúc {em} tuổi mới thật rực rỡ, và luôn có {anh} bên cạnh.</p>
+        </footer>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
