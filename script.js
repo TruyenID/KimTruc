@@ -1868,10 +1868,12 @@ function initHeartPortal() {
     const hint = $('portalHint');
 
     let target = 0, t = 0, done = false, raf = null;
-    // Màn hình hẹp thì bánh phải lớn hơn ngay từ đầu, nếu không nó chìm nghỉm
-    // giữa quầng sáng của trái tim
-    const CAKE_BASE = isSmall ? .46 : .32;
-    const CAKE_GROW = isSmall ? 1.30 : 1.55;
+    /* Bánh phải giữ đúng TỈ LỆ với trái tim ở mọi khổ màn. Trên màn dọc hẹp,
+       trái tim bị co lại cho vừa khung — nếu bánh vẫn giữ nguyên cỡ thì quầng
+       ấm của nó phủ lên tim và kéo màu về trắng bệch. */
+    const fit = window.Stage3D?.portalFit?.() ?? 1;
+    const CAKE_BASE = .32 * fit;
+    const CAKE_GROW = 1.55 * (.45 + .55 * fit);   // vẫn phóng to đủ ở đoạn cuối
 
     document.documentElement.classList.add('portal-open');
     buildCandles($('portalCandles'), false);      // nến trang trí, không bấm được

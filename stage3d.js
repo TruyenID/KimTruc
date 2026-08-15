@@ -35,15 +35,49 @@ const isSmall = BD.isSmall ?? matchMedia('(pointer: coarse)').matches;
    phải tô lại — cộng thêm bloom quét nhiều lượt trên toàn khung hình nữa.
    Nên đòn bẩy mạnh nhất là hạ `dpr`: từ 1.5 xuống 1.0 cắt gần một nửa số điểm
    ảnh, mà mắt gần như không nhận ra vì cảnh toàn đốm sáng nhoè. */
+/* ── Hai mức chất lượng, KHÔNG phải hai thiết bị ──
+   Trước đây điện thoại bị cắt hạt xuống 2.600 (desktop 9.000) nên trái tim loãng
+   hẳn so với desktop. Nhưng chỗ cắt đó sai: cái làm giật là lúc CUỘN trang tiệc,
+   còn màn cổng thì đứng yên — không cuộn, không panel, không canvas 2D.
+
+   Nên dựng đủ 9.000 hạt trên mọi máy, rồi dùng setDrawRange() để vẽ:
+     · màn cổng  → vẽ TOÀN BỘ, đẹp ngang desktop
+     · trang tiệc → điện thoại chỉ vẽ phần đầu mảng, giữ cuộn mượt
+   Hạt sinh ra theo thứ tự ngẫu nhiên nên lấy phần đầu bao nhiêu cũng vẫn là một
+   mẫu phân bố đều của trái tim — không bị khuyết mảng nào. */
 const Q = isSmall
-    ? { stars: 3600, heart: 2600, dust: 0, fw: 900, dpr: 1, bloom: true, glass: false, fps: 32 }
-    : { stars: 14000, heart: 9000, dust: 700, fw: 3600, dpr: 2, bloom: true, glass: true, fps: 0 };
+    ? {
+        stars: 14000, starsParty: 3200,      // thiên hà: BẰNG desktop ở màn cổng
+        heart: 9000, heartParty: 2800,       // trái tim: bằng desktop ở màn cổng
+        dust: 700, dustParty: 0,             // bụi vàng: có ở màn cổng, tắt khi cuộn
+        fw: 900,
+        dpr: 1, dprPortal: 2,                // BẰNG desktop ở màn cổng — giữ đúng màu
+        bloom: true, glass: false,
+        fps: 32, fpsPortal: 0                // màn cổng kéo tay nên đừng bóp nhịp
+    }
+    : {
+        stars: 14000, starsParty: 14000,
+        heart: 9000, heartParty: 9000,
+        dust: 700, dustParty: 700, fw: 3600,
+        dpr: 2, dprPortal: 2,
+        bloom: true, glass: true,
+        fps: 0, fpsPortal: 0
+    };
 
-if (reduceMotion) { Q.stars = 2600; Q.heart = 2200; Q.dust = 0; Q.fw = 600; }
+if (reduceMotion) {
+    Q.stars = Q.starsParty = 2600;
+    Q.heart = Q.heartParty = 2200;
+    Q.dust = Q.dustParty = 0; Q.fw = 600;
+}
 
-/* Điện thoại yếu (ít nhân CPU / ít RAM) → hạ tiếp một nấc, tắt hẳn bloom */
+/* Điện thoại yếu (ít nhân CPU / ít RAM) → hạ tiếp một nấc, tắt hẳn bloom.
+   Máy này thì màn cổng cũng không gánh nổi mức đầy đủ. */
 if (isSmall && ((navigator.hardwareConcurrency || 4) <= 4 || (navigator.deviceMemory || 4) <= 3)) {
-    Q.stars = 2200; Q.heart = 1800; Q.fw = 600; Q.bloom = false; Q.fps = 26;
+    Q.stars = 3000; Q.starsParty = 2000;
+    Q.heart = 4200; Q.heartParty = 1800;
+    Q.dust = 300; Q.dustParty = 0;
+    Q.fw = 600; Q.bloom = false;
+    Q.dprPortal = 1; Q.fps = 26; Q.fpsPortal = 26;
 }
 
 /* ══════════ BẢNG MÀU CHO 3 GIAO DIỆN ══════════ */
@@ -91,11 +125,14 @@ let portalT = 0;                              // tiến độ bay vào cổng tr
    bánh (phần tử DOM đặt ở giữa) vẫn khớp ở mọi góc nhìn. */
 const orbit = { yaw: 0, pitch: 0, yawT: 0, pitchT: 0 };
 const PITCH_MAX = 1.15;                       // ~66°, chừa biên để không lật qua cực
-const PORTAL_SCALE = 1.35;                    // đủ to mà vẫn lọt khung, thấy trọn hình tim
+const PORTAL_SCALE = 1.35;                    // cỡ tối đa (màn rộng)
+const HEART_R = 1.42 * 2.55;                  // bán kính trái tim ở scale 1 (đo từ hình học)
 const PORTAL_POINT = 1.75;                    // hạt to hơn ở màn cổng — xem ghi chú trong portal()
 let drift = 0, pulse = 0, scrollT = 0;
+/* Hệ số bù bloom theo độ phân giải thật của buffer. 1 = rộng như desktop retina. */
+let bloomK = 1;
 let acc = 0;                                  // dồn thời gian giữa 2 lần vẽ
-const MIN_DT = Q.fps ? 1 / Q.fps : 0;         // 0 = vẽ mọi khung hình (desktop)
+let MIN_DT = Q.fps ? 1 / Q.fps : 0;           // 0 = vẽ mọi khung hình (desktop)
 const camTarget = { rx: 0, ry: 0 };
 const camSmooth = { rx: 0, ry: 0 };
 
@@ -635,6 +672,38 @@ function init() {
    cả hai hắt sáng qua lớp kính mờ của panel. */
 const home = { heartX: 0, gemX: -8, gemZ: -2, gemR: 1.6 };
 
+/* ⚠️ ĐÂY MỚI LÀ NGUYÊN NHÂN TRÁI TIM TRÊN ĐIỆN THOẠI KHÁC MÀU ⚠️
+
+   Cỡ trái tim tính theo góc mở ĐỨNG của camera, nên trên màn hình nào nó cũng
+   cao chừng ấy pixel. Nhưng màn điện thoại DỌC và hẹp: trái tim rộng khoảng
+   450px mà khung chỉ có 390px, thế là hai bên bị cắt mất — mà đó lại đúng là
+   phần viền đậm màu nhất. Người xem chỉ còn thấy phần lõi nhạt ở giữa, nên
+   tưởng là "màu khác", trong khi thật ra là bị xén.
+
+   Đo được: cùng một cấu hình, đổi khung từ 1440×900 sang 390×844 là độ bão hoà
+   rớt từ 0,33 xuống 0,13 — cấu hình không liên quan gì.
+
+   Nên phải co trái tim cho vừa chiều HẸP của khung nhìn, không phải chiều cao. */
+function portalScale() {
+    const halfH = Math.tan(camera.fov * Math.PI / 360) * 19;
+    const halfW = halfH * camera.aspect;
+    const fit = Math.min(halfH, halfW) * 0.82 / HEART_R;   // chừa 18% lề cho quầng bloom
+    return Math.min(PORTAL_SCALE, fit);
+}
+
+/* Bloom làm mờ theo số texel cố định, nên trên buffer nhỏ nó loang rộng hơn hẳn
+   so với kích thước ảnh: quầng sáng phủ lên khắp trái tim và kéo mọi màu về xám.
+   Buffer điện thoại rộng 780 texel, desktop retina 2880 — chênh 3,7 lần, không
+   cách nào bù bằng dpr được. Nên bù bằng cách siết chính cái bloom lại: nhẹ hơn,
+   gọn hơn, và chỉ cho những điểm thật sáng mới loé. */
+function applyBloom() {
+    if (!bloomPass) return;
+    const pal = THEME3D[document.documentElement.dataset.theme] || THEME3D.night;
+    bloomPass.strength = pal.bloom * (0.30 + 0.70 * bloomK);
+    bloomPass.radius = 0.45 * (0.25 + 0.75 * bloomK);
+    bloomPass.threshold = 0.42 + (1 - bloomK) * 0.30;
+}
+
 function layoutScene() {
     if (!heart) return;                 // gọi cả lúc init (ok chưa bật) lẫn lúc resize
     const stage = document.querySelector('.stage');
@@ -658,6 +727,63 @@ function layoutScene() {
     heart.position.x = home.heartX;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   CHUYỂN MỨC CHẤT LƯỢNG
+   ──────────────────────────────────────────────────────────────
+   `dpr` không chỉ quyết định độ sắc nét — nó quyết định luôn MÀU SẮC.
+
+   UnrealBloomPass làm mờ theo tỉ lệ khung ảnh, không theo pixel tuyệt đối.
+   Chạy trên buffer 390×844 (dpr 1) thay vì 2880×1800 (dpr 2), cùng một bán kính
+   bloom sẽ loang rộng gấp bội so với kích thước ảnh — ánh sáng của các hạt trộn
+   lẫn vào nhau, cộng dồn kiểu additive rồi kẹt trần ở trắng. Kết quả đo được:
+   kênh xanh lá vọt lên +31 trong khi đỏ và lam chỉ +14, tức là trái tim bợt màu,
+   mất hẳn sắc hồng tím mà bản desktop có.
+
+   Nên ở màn cổng — màn ĐỨNG YÊN, không cuộn, không panel, không canvas 2D —
+   ta trả điện thoại về đúng dpr của desktop. Sang trang tiệc thì hạ lại để
+   giữ cho thao tác cuộn mượt. */
+function setQuality(portalMode) {
+    const dpr = Math.min(devicePixelRatio || 1, portalMode ? Q.dprPortal : Q.dpr);
+
+    renderer.setPixelRatio(dpr);
+    composer.setPixelRatio(dpr);
+    composer.setSize(innerWidth, innerHeight);
+
+    /* ⚠️ ĐÂY MỚI LÀ THỨ QUYẾT ĐỊNH MÀU ⚠️
+       UnrealBloomPass làm mờ bằng số lần lấy mẫu cố định trên lưới TEXEL, nên
+       bán kính thật của quầng sáng luôn tính theo TỈ LỆ khung ảnh, không theo
+       pixel tuyệt đối. Buffer của điện thoại chỉ rộng 780 texel so với 1440 của
+       desktop → cùng một `radius` thì quầng loang rộng gần gấp đôi so với ảnh,
+       ánh sáng các hạt trộn vào nhau và cộng dồn kiểu additive tới mức kẹt trần
+       ở trắng. Đó là lý do trái tim trên điện thoại bợt màu chứ không phải do
+       ít hạt hay thiếu aurora.
+
+       Vậy phải co bán kính lại theo đúng tỉ lệ độ phân giải. */
+    if (bloomPass) {
+        bloomK = Math.max(0.3, Math.min(1, (innerWidth * dpr) / 2400));
+        applyBloom();
+        bloomPass.resolution.set(innerWidth, innerHeight);
+    }
+
+    // gl_PointSize nhân với uDpr, nên đổi dpr mà quên uniform là hạt sai kích thước
+    [galaxy, heart, dust, fireworks].filter(Boolean)
+        .forEach(o => { if (o.material.uniforms.uDpr) o.material.uniforms.uDpr.value = dpr; });
+
+    /* Số hạt của trái tim phải tỉ lệ với DIỆN TÍCH nó chiếm trên màn, không phải
+       là một con số cố định. Trên màn dọc hẹp, trái tim bị co lại cho vừa khung;
+       giữ nguyên 9.000 hạt trong vùng nhỏ hơn nghĩa là mật độ tăng vọt, additive
+       cộng dồn kẹt trần và lõi tim trắng bệch ra. Giữ nguyên mật độ thì màu mới
+       giống desktop. (Mảng hạt xếp ngẫu nhiên nên lấy phần đầu bao nhiêu cũng
+       vẫn là mẫu phân bố đều của trái tim.) */
+    const dens = portalMode ? Math.pow(portalScale() / PORTAL_SCALE, 2) : 1;
+    heart.geometry.setDrawRange(0, Math.round((portalMode ? Q.heart : Q.heartParty) * dens));
+    galaxy.geometry.setDrawRange(0, portalMode ? Q.stars : Q.starsParty);
+    if (dust) dust.geometry.setDrawRange(0, portalMode ? Q.dust : Q.dustParty);
+
+    const fps = portalMode ? Q.fpsPortal : Q.fps;
+    MIN_DT = fps ? 1 / fps : 0;
+}
+
 /* Cùng lý do với handler resize bên script.js: thanh địa chỉ trên điện thoại
    trượt lên xuống là bắn resize. Ở đây còn đắt hơn nhiều — setSize() cấp phát
    lại toàn bộ render target của composer và của bloom. Làm việc đó giữa lúc
@@ -674,8 +800,8 @@ function onResize() {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
-    composer.setSize(innerWidth, innerHeight);
-    if (bloomPass) bloomPass.resolution.set(innerWidth, innerHeight);
+    setQuality(mode === 'portal');       // giữ nguyên mức của màn đang mở
+    if (mode === 'portal') heart.scale.setScalar(portalScale() + portalT * 0.9);
     layoutScene();
 }
 
@@ -698,9 +824,10 @@ const Stage3D = {
         active = true;                       // bật render, dù chưa vào tiệc
         portalT = 0;
 
+        setQuality(true);                                          // full chất lượng: màn này đứng yên
         orbit.yaw = orbit.yawT = orbit.pitch = orbit.pitchT = 0;   // bắt đầu từ chính diện
         heart.position.set(0, 0, 0);
-        heart.scale.setScalar(PORTAL_SCALE);
+        heart.scale.setScalar(portalScale());
         heart.material.uniforms.uExplode.value = 0;
         /* Hạt phải to hơn hẳn ở màn này. Cùng số hạt đó trải trên gần cả màn hình
            thì loãng ra thành bụi, không đọc ra hình trái tim nữa — mà cả màn này
@@ -711,11 +838,18 @@ const Stage3D = {
         const fade = [galaxy, heart].map(o => o.material.uniforms.uOpacity);
         if (g) {
             g.to(fade, { value: 1, duration: 1.6, stagger: 0.25, ease: 'power2.out' });
+            if (dust) g.to(dust.material.uniforms.uOpacity, { value: 1, duration: 1.8, delay: 0.4 });
             g.fromTo(camera.position, { z: 40 }, { z: 19, duration: 2.4, ease: 'power3.out' });
         } else {
             fade.forEach(u => { u.value = 1; });
+            if (dust) dust.material.uniforms.uOpacity.value = 1;
         }
     },
+
+    /* Tỉ lệ trái tim đang bị co lại so với cỡ tối đa (1 = màn rộng, <1 = màn hẹp).
+       script.js dùng số này để chiếc bánh giữ đúng tỉ lệ với trái tim ở mọi khổ
+       màn hình — bánh quá to thì quầng ấm của nó phủ lên tim và làm bệch màu. */
+    portalFit() { return ok ? portalScale() / PORTAL_SCALE : 1; },
 
     /* Tiến độ bay vào, 0 = còn đứng ngoài, 1 = đã ở trong lòng trái tim */
     portalZoom(t) { portalT = Math.max(0, Math.min(1, t)); },
@@ -735,6 +869,7 @@ const Stage3D = {
         const fromPortal = mode === 'portal';
         mode = 'party';
         active = true;
+        setQuality(false);                   // hạ lại để trang tiệc cuộn mượt
         layoutScene();                       // trả trái tim về lề, trả lại tỉ lệ
 
         const g = window.gsap;
@@ -803,10 +938,7 @@ const Stage3D = {
         tween(gem.material.color, pal.c);
         tween(ring.material.color, pal.b);
 
-        if (bloomPass) {
-            if (g) g.to(bloomPass, { strength: pal.bloom, duration: 0.9 });
-            else bloomPass.strength = pal.bloom;
-        }
+        applyBloom();          // giữ nguyên phần bù theo độ phân giải
         if (g) g.to(renderer, { toneMappingExposure: pal.exposure, duration: 0.9 });
         else renderer.toneMappingExposure = pal.exposure;
     },
@@ -891,7 +1023,7 @@ const Stage3D = {
             // để lại chút đung đưa ±8° cho có sinh khí, xoay nhiều nữa thì hai
             // chuyển động chồng lên nhau, nhìn rối.
             heart.rotation.y = Math.sin(elapsed * 0.32) * 0.14;
-            heart.scale.setScalar(PORTAL_SCALE + portalT * 0.9);
+            heart.scale.setScalar(portalScale() + portalT * 0.9);
             // Chỉ nở ra ở nửa sau hành trình. Nở sớm thì vỏ tim nhoè ngay từ đầu,
             // đúng lúc người xem đang cần nhìn rõ đó là trái tim.
             heart.material.uniforms.uExplode.value = Math.max(0, (portalT - 0.45) / 0.55) * 0.5;

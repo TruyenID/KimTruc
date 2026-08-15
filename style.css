@@ -2613,6 +2613,15 @@ html[data-theme="luxe"] .fortune-front {
         display: none;
     }
 
+    /* …nhưng màn cổng thì trả lại. Aurora chỉ đắt lúc CUỘN (khối mờ 38px phải
+       tô lại mỗi khung hình), mà màn cổng thì đứng yên. Thiếu nó, trái tim trên
+       điện thoại mất hẳn lớp màu nền — đo được độ bão hoà thân tim rớt từ 0,32
+       xuống 0,13 so với desktop. */
+    html.portal-open .has-3d .aurora,
+    html.portal-open.has-3d .aurora {
+        display: block;
+    }
+
     .icon-btn {
         backdrop-filter: none;
         -webkit-backdrop-filter: none;

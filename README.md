@@ -68,6 +68,38 @@ Vài điểm đáng lưu ý trong lúc dựng màn này:
   (`.portal-cake::before`) để bánh luôn tách ra được ở mọi góc.
 - Cùng số hạt đó trải trên gần cả màn hình thì loãng thành bụi. Phải phóng to hạt
   (`uSizeBoost`) chứ không phải thu nhỏ trái tim.
+
+#### Vì sao trái tim trên điện thoại từng khác màu desktop
+
+Cỡ trái tim tính theo góc mở **đứng** của camera, nên màn nào nó cũng cao chừng
+ấy pixel. Nhưng màn điện thoại **dọc và hẹp**: trái tim rộng ~450px mà khung chỉ
+390px → hai bên bị xén mất, mà đó đúng là phần viền đậm màu nhất. Người xem chỉ
+còn thấy phần lõi nhạt ở giữa nên tưởng "màu khác".
+
+Thí nghiệm tách bạch đã chứng minh cấu hình không liên quan — cùng **một** cấu
+hình desktop, chỉ đổi khung hình:
+
+| Tổ hợp | Bão hoà thân tim |
+|---|---|
+| cấu hình desktop · khung 1440×900 | 0,33 |
+| cấu hình **desktop** · khung 390×844 | 0,13 |
+| cấu hình mobile · khung 390×844 | 0,13 |
+
+Ba việc phải làm cùng lúc, thiếu cái nào cũng không đủ:
+
+1. **Co trái tim cho vừa chiều HẸP** của khung nhìn, không phải chiều cao.
+2. **Số hạt tỉ lệ với diện tích tim trên màn.** Co tim mà giữ nguyên 9.000 hạt
+   thì mật độ vọt lên, additive cộng dồn kẹt trần và lõi trắng bệch.
+3. **Bù bloom theo độ phân giải.** Bloom mờ theo số texel cố định nên trên buffer
+   780 texel nó loang rộng gấp 3,7 lần so với 2880 của desktop retina, phủ lên
+   khắp trái tim và kéo màu về xám. Không bù được bằng `dpr` — phải siết chính
+   cường độ, bán kính và ngưỡng của nó.
+
+Cộng thêm: chiếc bánh cũng phải giữ đúng tỉ lệ với trái tim (`Stage3D.portalFit()`),
+vì quầng ấm của nó phủ lên tim cũng làm bệch màu.
+
+Kết quả đo (bão hoà, desktop → mobile): lõi 0,14 → **0,15** · thân 0,32 → **0,25**
+· viền 0,69 → **0,62**. Trước khi sửa thân chỉ có 0,13.
 - Vỏ tim chỉ nở ra ở nửa sau hành trình. Nở sớm thì hình tim nhoè ngay lúc người
   xem đang cần nhận ra nó.
 - Bánh ở màn này có nến riêng, nên `blowAll()` / `checkAllOut()` phải giới hạn
