@@ -2766,3 +2766,142 @@ html[data-theme="luxe"] .fortune-front {
        mục reveal sai chỗ. Đổi một chút hiệu năng lấy nguy cơ hỏng reveal là không
        đáng, nhất là khi các panel ở đây vốn đã nhẹ. */
 }
+
+/* ══════════════════════════════════════════════════════════════
+   KHU VỰC BÁNH KEM — nơi hay giật nhất khi cuộn trên điện thoại
+   ══════════════════════════════════════════════════════════════ */
+@media (hover: none) {
+
+    /* ⚠️ THỦ PHẠM ⚠️
+       Mỗi ngọn nến animate `transform` theo chu kỳ 0,28 giây — tức là chạy liên
+       tục ở 60 khung/giây — mà trên mình lại đeo HAI lớp box-shadow mờ (14px và
+       34px). Cứ mỗi khung hình trình duyệt phải tô lại cả hai vầng mờ đó, nhân
+       với 5 ngọn nến. Cộng thêm `.cake` cũng đang animate nên cả khối bánh phải
+       ghép lớp lại theo.
+
+       Giữ nguyên ngọn lửa vẫn lung linh, chỉ bỏ vầng mờ lớn phía ngoài (vầng
+       trong 14px đã đủ thấy ánh nến) và giãn nhịp rung ra một chút. */
+    .flame {
+        box-shadow: 0 0 12px var(--gold);
+        animation-duration: .42s;
+    }
+
+    /* Nến trong màn intro cũng vậy: drop-shadow là bộ lọc, đắt hơn box-shadow */
+    .i-flame {
+        filter: drop-shadow(0 0 10px rgba(255, 190, 80, .85));
+    }
+
+    /* Chữ gợi ý nhấp nháy mỗi giây ngay dưới bánh — đổi opacity thì rẻ, nhưng
+       nó nằm trong vùng đang cuộn nên vẫn góp phần. Giãn nhịp cho nhẹ bớt. */
+    .cake-hint {
+        animation-duration: 2s;
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MÀN 6 — CỔNG TRÁI TIM
+   Bánh sinh nhật nằm đúng tâm trái tim hạt 3D. Lăn chuột / chụm
+   ngón tay để bay xuyên qua lớp vỏ hạt vào bên trong.
+   ══════════════════════════════════════════════════════════════ */
+
+/* Nền overlay của hành trình vốn đục (#030208) để che trang tiệc phía sau.
+   Ở màn này phải cho trong suốt mới nhìn thấy trái tim WebGL (z-index 2) —
+   nhưng như vậy thì nội dung trang tiệc cũng lộ ra, nên phải giấu nó đi. */
+html.portal-open .intro {
+    background: transparent;
+}
+
+html.portal-open .stage {
+    visibility: hidden;
+}
+
+.scene-portal {
+    /* Bánh nằm giữa, chữ gợi ý xuống đáy — không dùng grid mặc định của .scene */
+    display: block;
+}
+
+.portal-cake {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 260px;
+    height: 230px;
+    margin: 0;
+    /* transform do JS ghi mỗi khung theo tiến độ bay vào */
+    transform: translate(-50%, -50%) scale(.32);
+    transform-origin: 50% 50%;
+    opacity: 0;
+    /* Quầng ấm cho bánh, cộng một lớp bóng tối để viền bánh còn tách ra được
+       khỏi ánh sáng rất chói của trái tim phía sau */
+    filter: drop-shadow(0 0 26px rgba(255, 190, 120, .4)) drop-shadow(0 3px 12px rgba(0, 0, 0, .6));
+    will-change: transform, opacity;
+}
+
+.portal-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 96px;
+    transform: translateX(-50%);
+    width: min(560px, 86vw);
+    margin: 0;
+}
+
+/* Vòng tiến độ mảnh chạy dưới chữ gợi ý */
+.portal-meter {
+    position: absolute;
+    left: 50%;
+    bottom: 74px;
+    transform: translateX(-50%);
+    width: min(260px, 62vw);
+    height: 3px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, .14);
+    overflow: hidden;
+}
+
+.portal-meter i {
+    display: block;
+    height: 100%;
+    width: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--accent-2), var(--accent));
+    transform: scaleX(var(--p, 0));
+    transform-origin: 0 50%;
+    box-shadow: 0 0 12px var(--accent-2);
+}
+
+/* Đã bay quá nửa đường thì chữ gợi ý lui đi, nhường chỗ cho khoảnh khắc.
+   Phải tắt cả `animation` chứ không chỉ đặt opacity: 0 — .scene-hint đang chạy
+   animation hintPulse, mà giá trị do animation sinh ra luôn thắng khai báo
+   thường trong CSS, nên nếu không tắt thì chữ vẫn nhấp nháy như cũ. */
+.scene-portal.diving .portal-hint,
+.scene-portal.diving .portal-meter {
+    animation: none;
+    opacity: 0;
+    transition: opacity .6s ease-out;
+}
+
+/* Ngọn nến trên bánh của màn cổng: bánh bị thu nhỏ nên bóng đổ phải nhẹ hơn,
+   nếu không vầng sáng sẽ to bằng cả chiếc bánh */
+.portal-cake .flame {
+    box-shadow: 0 0 10px var(--gold);
+}
+
+@media (max-width: 560px) {
+    .portal-hint {
+        bottom: 88px;
+        font-size: .95rem;
+    }
+
+    .portal-meter {
+        bottom: 68px;
+    }
+}
+
+/* Giảm chuyển động: bỏ hẳn màn bay, chỉ cần một cú chạm là qua */
+@media (prefers-reduced-motion: reduce) {
+    .portal-cake {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+}

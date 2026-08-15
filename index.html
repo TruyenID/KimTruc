@@ -116,7 +116,41 @@
             <p class="scene-hint" id="heartHint">Điều cuối cùng — trái tim {anh}, đang đập vì {em}…<br><b>chạm và giữ
                     cho tới khi nó vỡ oà</b> 💗</p>
             <div class="scene-done" id="heartDone" hidden>
-                <h2 class="scene-title">Tim {anh} là của {em} rồi đó 💞<br>Bữa tiệc bắt đầu thôi!</h2>
+                <h2 class="scene-title">Tim {anh} là của {em} rồi đó 💞<br>Mở nó ra xem bên trong có gì nhé…</h2>
+            </div>
+        </section>
+
+        <!-- ── MÀN 6: bay vào trong trái tim ──
+             Màn này để nền TRONG SUỐT (html.portal-open) nên nhìn thẳng xuống
+             lớp WebGL phía dưới: trái tim hạt 3D nằm chính giữa màn hình, và
+             chiếc bánh sinh nhật đặt đúng tâm nó. -->
+        <section class="scene scene-portal" id="scene6">
+            <div class="portal-cake" id="portalCake" aria-hidden="true">
+                <div class="cake">
+                    <div class="candles" id="portalCandles"></div>
+                    <div class="tier tier-top">
+                        <span class="drip"></span><span class="drip"></span><span class="drip"></span>
+                        <span class="drip"></span><span class="drip"></span>
+                    </div>
+                    <div class="tier tier-mid">
+                        <span class="drip"></span><span class="drip"></span><span class="drip"></span>
+                        <span class="drip"></span><span class="drip"></span><span class="drip"></span>
+                    </div>
+                    <div class="tier tier-bottom">
+                        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                    </div>
+                    <div class="plate"></div>
+                </div>
+            </div>
+
+            <p class="scene-hint portal-hint" id="portalHint">Trái tim {anh} mở ra rồi, bánh {anh} giấu ở
+                trong…<br><b>lăn chuột để bay vào</b> 💗</p>
+
+            <div class="portal-meter" id="portalMeter" aria-hidden="true"><i></i></div>
+
+            <div class="scene-done" id="portalDone" hidden>
+                <h2 class="scene-title">{Em} vào tới nơi rồi —<br>bên trong tim {anh} chỉ có {em} thôi 🎂</h2>
             </div>
         </section>
     </div>

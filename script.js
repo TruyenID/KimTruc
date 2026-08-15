@@ -158,7 +158,9 @@ const has3D = () => !!(window.Stage3D && window.Stage3D.ready);
 
 /* Cờ tiết kiệm cho điện thoại (bật lúc vào tiệc, xem enterParty) */
 let bg2dOff = false;      // tắt hẳn trường sao 2D — thiên hà WebGL đã thay thế
-let cardVisible = true;   // thiệp còn trong tầm nhìn không
+let cakeVisible = true;   // khu vực bánh kem còn trong tầm nhìn không
+let nameVisible = true;   // khu vực tên ghép từ hạt còn trong tầm nhìn không
+let vizSkip = 0;          // bộ đếm vẽ cách khung cho vòng visualizer
 
 /* Rung nhẹ phản hồi trên điện thoại (Android) */
 function buzz(pattern) {
@@ -687,11 +689,22 @@ const viz = $('vizCanvas');
 const vizx = viz.getContext('2d');
 let vizRot = 0;
 
+/* Quầng sáng giữa vòng visualizer.
+   Bản cũ gọi createRadialGradient() ở MỖI khung hình — tức là cấp phát một đối
+   tượng gradient mới 60 lần mỗi giây, chỉ để đổi mỗi độ mờ. Dựng sẵn một lần với
+   màu đặc, rồi điều tiết bằng globalAlpha: nhìn y hệt, mà không rác bộ nhớ. */
+let vizGlow = null;
+
 function drawViz(ts) {
+    // Trên điện thoại vẽ cách khung: vòng nhạc nhảy 30 lần/giây là quá đủ mượt,
+    // mà nhường được nửa thời gian CPU cho thao tác cuộn.
+    if (isSmall) { vizSkip ^= 1; if (vizSkip) return; }
+
     const W = viz.width, cx = W / 2, cy = W / 2;
     vizx.clearRect(0, 0, W, W);
     const bars = PERF.vizBars, baseR = 104;
-    vizRot += .0016;
+    const pal = CONFIG.palette, nc = pal.length;
+    vizRot += isSmall ? .0032 : .0016;          // bù lại vì mỗi khung vẽ đi 2 nhịp
 
     let bass = 0;
     if (analyser && musicOn) {
@@ -700,32 +713,47 @@ function drawViz(ts) {
         bass /= 8 * 255;
     }
 
-    for (let i = 0; i < bars; i++) {
-        let v;
-        if (analyser && musicOn) v = (vizData[2 + i] / 255) * 46 + 4;
-        else v = 8 + 6 * Math.sin(ts / 520 + i * .42);   // nhịp thở khi chưa bật nhạc
+    /* Gom các vạch theo MÀU rồi vẽ mỗi màu một lượt.
+       Bản cũ gọi stroke() riêng cho từng vạch — 40 lượt mỗi khung hình, mà mỗi
+       lượt stroke() đều bắt trình duyệt dựng lại đường viền từ đầu. Bảng màu chỉ
+       có 7 màu, nên gom lại còn đúng 7 lượt. */
+    vizx.lineWidth = 3;
+    vizx.lineCap = 'round';
 
-        const a = (i / bars) * Math.PI * 2 + vizRot;
-        const r2 = baseR + v;
-        vizx.globalAlpha = .5 + (v / 52) * .4;
-        vizx.strokeStyle = CONFIG.palette[i % CONFIG.palette.length];
-        vizx.lineWidth = 3;
-        vizx.lineCap = 'round';
+    for (let c = 0; c < nc; c++) {
+        let sum = 0, n = 0;
         vizx.beginPath();
-        vizx.moveTo(cx + Math.cos(a) * baseR, cy + Math.sin(a) * baseR);
-        vizx.lineTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2);
+
+        for (let i = c; i < bars; i += nc) {
+            const v = (analyser && musicOn)
+                ? (vizData[2 + i] / 255) * 46 + 4
+                : 8 + 6 * Math.sin(ts / 520 + i * .42);   // nhịp thở khi chưa bật nhạc
+
+            const a = (i / bars) * Math.PI * 2 + vizRot;
+            const ca = Math.cos(a), sa = Math.sin(a);
+            vizx.moveTo(cx + ca * baseR, cy + sa * baseR);
+            vizx.lineTo(cx + ca * (baseR + v), cy + sa * (baseR + v));
+            sum += v; n++;
+        }
+
+        if (!n) continue;
+        vizx.globalAlpha = .5 + (sum / n / 52) * .4;      // độ mờ trung bình của nhóm
+        vizx.strokeStyle = pal[c];
         vizx.stroke();
     }
 
-    // quầng sáng giữa đập theo bass
-    const glow = vizx.createRadialGradient(cx, cy, 10, cx, cy, baseR);
-    glow.addColorStop(0, `rgba(255,215,110,${.10 + bass * .3})`);
-    glow.addColorStop(1, 'rgba(255,215,110,0)');
-    vizx.globalAlpha = 1;
-    vizx.fillStyle = glow;
+    // Quầng sáng giữa đập theo bass — gradient dựng sẵn, chỉ đổi độ mờ
+    if (!vizGlow) {
+        vizGlow = vizx.createRadialGradient(cx, cy, 10, cx, cy, baseR);
+        vizGlow.addColorStop(0, 'rgba(255,215,110,1)');
+        vizGlow.addColorStop(1, 'rgba(255,215,110,0)');
+    }
+    vizx.globalAlpha = .10 + bass * .3;
+    vizx.fillStyle = vizGlow;
     vizx.beginPath();
     vizx.arc(cx, cy, baseR, 0, Math.PI * 2);
     vizx.fill();
+    vizx.globalAlpha = 1;
 }
 
 /* ══════════ TÊN GHÉP TỪ HẠT SÁNG ══════════ */
@@ -843,12 +871,10 @@ function loop(ts) {
     // toàn màn hình vẽ thừa — bỏ hẳn, tiết kiệm cả lượt vẽ lẫn lượt ghép lớp.
     if (!bg2dOff) drawStars();
 
-    // Vòng visualizer và tên ghép từ hạt đều nằm TRONG tấm thiệp. Cuộn qua rồi
-    // thì không ai thấy, nhưng vòng lặp vẫn chạy đủ mọi phép tính cho từng hạt.
-    if (cardVisible) {
-        drawViz(ts);
-        drawNameParticles(ts);
-    }
+    // Vòng visualizer và tên ghép từ hạt nằm ở hai chỗ khác nhau trong thiệp,
+    // nên theo dõi riêng: cuộn qua cái nào thì tắt đúng cái đó.
+    if (cakeVisible) drawViz(ts);
+    if (nameVisible) drawNameParticles(ts);
 
     fxx.clearRect(0, 0, innerWidth, innerHeight);
 
@@ -942,15 +968,20 @@ function typeWish() {
 /* ══════════ NẾN & THỔI NẾN ══════════ */
 let blownAll = false;
 
-function buildCandles() {
-    const wrap = $('candles');
+/* CHỈ những ngọn nến trên bánh của tấm thiệp. Màn 6 cũng có một chiếc bánh với
+   nến riêng — nếu quét '.candle' toàn trang thì "thổi hết nến" sẽ không bao giờ
+   thành công, vì mấy ngọn ở màn 6 chẳng ai thổi. */
+const cardCandles = () => [...document.querySelectorAll('#candles .candle')];
+
+function buildCandles(wrap = $('candles'), interactive = true) {
+    if (!wrap) return;
     wrap.innerHTML = '';
     for (let i = 0; i < CONFIG.candleCount; i++) {
         const c = document.createElement('div');
         c.className = 'candle';
         c.style.height = (38 + (i % 2 ? 8 : 0)) + 'px';
         c.innerHTML = '<div class="flame"></div>';
-        c.addEventListener('click', (e) => { e.stopPropagation(); blowCandle(c); });
+        if (interactive) c.addEventListener('click', (e) => { e.stopPropagation(); blowCandle(c); });
         wrap.appendChild(c);
     }
 }
@@ -968,17 +999,17 @@ function blowCandle(candle) {
 }
 
 function blowAll() {
-    document.querySelectorAll('.candle').forEach((c, i) => setTimeout(() => blowCandle(c), i * 110));
+    cardCandles().forEach((c, i) => setTimeout(() => blowCandle(c), i * 110));
 }
 
 function relightCandles() {
-    document.querySelectorAll('.candle').forEach(c => c.classList.remove('out'));
+    cardCandles().forEach(c => c.classList.remove('out'));
     blownAll = false;
     $('cakeHint').textContent = tx('{Em} thổi nến và ước đi, {anh} tính tới ba nhé 🕯️');
 }
 
 function checkAllOut() {
-    const all = [...document.querySelectorAll('.candle')].every(c => c.classList.contains('out'));
+    const all = cardCandles().every(c => c.classList.contains('out'));
     if (all && !blownAll) {
         blownAll = true;
         $('cakeHint').innerHTML = tx('🌠 Điều ước của {em} bay đi rồi! <button class="btn" id="relightBtn" style="padding:6px 14px;font-size:.85rem;margin-left:8px">Thắp lại 🕯️</button>');
@@ -1421,7 +1452,7 @@ function initGyro() {
    1. Chạm để thắp nến     2. Nối chòm sao       3. Thả bóng bay
    4. Kéo ruy băng mở quà  5. Chạm & giữ trái tim → vào tiệc
    ══════════════════════════════════════════════════════════════ */
-const SCENE_COUNT = 5;
+const SCENE_COUNT = 6;
 let sceneIdx = 1;
 const sceneReady = {};                       // đảm bảo mỗi màn chỉ khởi tạo một lần
 
@@ -1814,7 +1845,133 @@ function initHeartHold() {
     hold.addEventListener('keyup', up);
 }
 
-const SCENE_INIT = { 2: initConstellation, 3: initWishBalloons, 4: initGiftDrag, 5: initHeartHold };
+/* ══════════════════════════════════════════════════════════════
+   MÀN 6 — CỔNG TRÁI TIM
+   ──────────────────────────────────────────────────────────────
+   Trái tim hạt 3D (lớp WebGL, phía dưới) nằm chính giữa màn hình, chiếc bánh
+   sinh nhật đặt đúng tâm nó. Người xem lăn chuột / chụm ngón tay / kéo lên để
+   bay xuyên qua lớp vỏ hạt — vào tới nơi thì bữa tiệc bắt đầu.
+
+   Không có WebGL thì màn này tự bỏ qua (xem initHeartPortal), vì lúc đó chẳng
+   có trái tim nào để bay vào cả.
+   ══════════════════════════════════════════════════════════════ */
+function initHeartPortal() {
+    if (sceneReady[6]) return;
+    sceneReady[6] = true;
+
+    // Không có lớp 3D → không có gì để bay vào, chuyển thẳng sang bữa tiệc
+    if (!has3D()) { setTimeout(enterParty, 400); return; }
+
+    const scene = $('scene6');
+    const cakeEl = $('portalCake');
+    const meter = $('portalMeter');
+    const hint = $('portalHint');
+
+    let target = 0, t = 0, done = false, raf = null;
+    // Màn hình hẹp thì bánh phải lớn hơn ngay từ đầu, nếu không nó chìm nghỉm
+    // giữa quầng sáng của trái tim
+    const CAKE_BASE = isSmall ? .46 : .32;
+    const CAKE_GROW = isSmall ? 1.30 : 1.55;
+
+    document.documentElement.classList.add('portal-open');
+    buildCandles($('portalCandles'), false);      // nến trang trí, không bấm được
+    window.Stage3D?.portal();
+
+    // Điện thoại không có chuột để mà lăn — phải nói đúng thao tác của họ
+    if (isTouch) {
+        hint.innerHTML = tx('Trái tim {anh} mở ra rồi, bánh {anh} giấu ở trong…<br><b>vuốt lên để bay vào</b> 💗');
+    }
+
+    /* Giảm chuyển động: bỏ hẳn màn bay, một cú chạm là qua */
+    if (reduceMotion) {
+        hint.innerHTML = tx('Trái tim {anh} mở ra rồi…<br><b>chạm để vào trong</b> 💗');
+        scene.addEventListener('click', finish, { once: true });
+        return;
+    }
+
+    /* Vẽ lại theo tiến độ. Chạy trong rAF riêng vì đây là màn tương tác toàn
+       màn hình, nhưng ĐIỀU KIỆN KẾT THÚC không nằm ở đây — xem push(). */
+    function frame() {
+        t += (target - t) * .11;
+        window.Stage3D?.portalZoom(t);
+
+        const s = CAKE_BASE + t * CAKE_GROW;
+        cakeEl.style.transform = `translate(-50%, -50%) scale(${s.toFixed(3)})`;
+        cakeEl.style.opacity = Math.min(1, .2 + t * 1.8).toFixed(2);
+        meter.style.setProperty('--p', t.toFixed(3));
+
+        raf = requestAnimationFrame(frame);
+    }
+    raf = requestAnimationFrame(frame);
+
+    /* Đẩy tiến độ. Kiểm tra hoàn thành NGAY tại đây chứ không đợi rAF —
+       trình duyệt có thể bóp rAF, mà lúc đó người xem sẽ kẹt lại vĩnh viễn
+       dù đã lăn hết cỡ. */
+    function push(d) {
+        if (done) return;
+        target = Math.max(0, Math.min(1, target + d));
+        if (target > .6) scene.classList.add('diving');   // giữ chỉ dẫn cho tới khi gần tới nơi
+        if (target >= .999) finish();
+    }
+
+    function finish() {
+        if (done) return;
+        done = true;
+        cancelAnimationFrame(raf);
+        target = t = 1;
+        window.Stage3D?.portalZoom(1);
+        meter.style.setProperty('--p', 1);
+
+        hint.hidden = true;
+        $('portalDone').hidden = false;
+        buzz([18, 40, 24]);
+        beep(660, .18, 'triangle', .08);
+        setTimeout(() => beep(880, .3, 'sine', .09), 140);
+
+        setTimeout(() => gotoScene(SCENE_COUNT + 1), 1500);   // → enterParty()
+    }
+
+    /* ── Lăn chuột (desktop) ── */
+    scene.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        // ~20 nấc lăn cho trọn hành trình bay vào. Nhạy hơn nữa thì mới chạm
+        // vào bánh xe đã tới nơi, chẳng kịp nhìn gì.
+        push(e.deltaY * .00045);
+    }, { passive: false });
+
+    /* ── Chụm 2 ngón để zoom, hoặc kéo 1 ngón lên (điện thoại) ── */
+    let pinch0 = 0, dragY = 0;
+    const dist = (ts) => Math.hypot(ts[0].clientX - ts[1].clientX, ts[0].clientY - ts[1].clientY);
+
+    scene.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) pinch0 = dist(e.touches);
+        else dragY = e.touches[0].clientY;
+    }, { passive: true });
+
+    scene.addEventListener('touchmove', (e) => {
+        if (done) return;
+        e.preventDefault();
+        if (e.touches.length === 2) {
+            const d = dist(e.touches);
+            if (pinch0) push((d - pinch0) * .004);    // xoè ra = phóng to = bay vào
+            pinch0 = d;
+        } else {
+            const y = e.touches[0].clientY;
+            push((dragY - y) * .0022);                // kéo lên = bay vào (~1,5 lần vuốt)
+            dragY = y;
+        }
+    }, { passive: false });
+
+    /* ── Bàn phím + chạm đơn: luôn phải có đường đi tới đích ── */
+    scene.addEventListener('keydown', (e) => {
+        if (['ArrowUp', 'Enter', ' '].includes(e.key)) { e.preventDefault(); push(.2); }
+        if (e.key === 'ArrowDown') { e.preventDefault(); push(-.2); }
+    });
+    scene.addEventListener('click', () => push(.16));
+    scene.tabIndex = 0;
+}
+
+const SCENE_INIT = { 2: initConstellation, 3: initWishBalloons, 4: initGiftDrag, 5: initHeartHold, 6: initHeartPortal };
 
 function enterParty() {
     if (constRAF) cancelAnimationFrame(constRAF);
@@ -1822,36 +1979,52 @@ function enterParty() {
     // và phủ vô hình lên toàn trang, nuốt hết click của các nút bên dưới
     document.querySelectorAll('.scene').forEach(s => s.classList.remove('active', 'leaving'));
     $('intro').classList.add('open');
+    document.documentElement.classList.remove('portal-open');   // trả lại nền cho trang tiệc
     document.body.classList.remove('locked');
     warp = 36;                               // cú nhảy hyperspace xuyên trường sao
 
     // Bật lớp WebGL, rồi dựng lại sao 2D với mật độ thưa cho khỏi chồng lớp
     window.Stage3D?.start();
     if (has3D()) {
-        buildStars();
         if (isSmall) {                       // điện thoại: nhường hẳn nền cho WebGL
-            bg2dOff = true;
+            bg2dOff = true;                  // (khỏi dựng lại mảng sao rồi vứt đi)
             stars = []; shootingStars = [];
             bgx.clearRect(0, 0, innerWidth, innerHeight);
             bg.style.display = 'none';
+        } else {
+            buildStars();
         }
     }
 
-    // Ngừng tính hạt trong thiệp khi thiệp đã cuộn ra khỏi màn hình
+    // Ngừng vẽ đúng phần đã cuộn khỏi màn hình (bánh kem và tên theo dõi riêng)
     if ('IntersectionObserver' in window) {
-        new IntersectionObserver(
-            ([e]) => { cardVisible = e.isIntersecting; },
-            { rootMargin: '120px' }
-        ).observe($('card'));
+        const watch = (sel, set) => {
+            const el = document.querySelector(sel);
+            if (el) new IntersectionObserver(([e]) => set(e.isIntersecting), { rootMargin: '100px' }).observe(el);
+        };
+        watch('.cake-stage', v => { cakeVisible = v; });
+        watch('.name-stage', v => { nameVisible = v; });
     }
 
     document.dispatchEvent(new CustomEvent('party:start'));   // choreo.js đo lại mốc cuộn
 
     initGyro();
-    celebrate();
-    enableTilt();
-    buildNameParticles();                    // dựng lúc canvas đã hiện, đo đúng kích thước
-    for (let i = 0; i < 6; i++) setTimeout(spawnBalloon, i * 900);
+    enableTilt();                            // tự thoát ngay trên thiết bị cảm ứng
+
+    /* ⚠️ ĐÂY LÀ CHỖ GIẬT KHI VỪA VÀO TIỆC ⚠️
+       Trước đây mọi thứ nặng dồn hết vào ĐÚNG MỘT khung hình: dựng 23 mốc cuộn
+       (phải đo đạc toàn bộ panel), bắn pháo hoa, rồi buildNameParticles() —
+       hàm này gọi getImageData() rồi quét từng điểm ảnh của canvas để dựng hạt.
+       Cộng lại thừa sức làm rớt vài khung hình, đúng lúc tấm thiệp và bánh kem
+       hiện ra nên nhìn rất rõ.
+
+       Việc bắt buộc phải đồng bộ chỉ có dựng mốc cuộn (đã chứng minh: hoãn nó
+       lại thì nội dung kẹt luôn ở opacity 0). Phần còn lại tách ra khung sau —
+       dùng setTimeout chứ không dùng requestAnimationFrame, vì rAF có thể bị
+       trình duyệt bóp và không bao giờ chạy. */
+    setTimeout(celebrate, 30);
+    setTimeout(buildNameParticles, 90);      // canvas đã hiện nên đo đúng kích thước
+    for (let i = 0; i < 6; i++) setTimeout(spawnBalloon, 400 + i * 900);
 }
 
 /* ══════════ KHỞI TẠO ══════════ */

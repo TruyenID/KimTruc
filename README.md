@@ -26,7 +26,7 @@ python3 -m http.server 3000
 
 ## ✨ Có gì bên trong
 
-**Hành trình mở đầu — 5 màn, mỗi màn một động tác:**
+**Hành trình mở đầu — 6 màn, mỗi màn một động tác:**
 
 | # | Màn | Động tác |
 |---|-----|----------|
@@ -35,6 +35,29 @@ python3 -m http.server 3000
 | 3 | 🎈 Thả bóng bay mang từng chữ trong tên | Chạm từng quả |
 | 4 | 🎀 Mở hộp quà | Kéo dải ruy băng |
 | 5 | 💗 Trái tim đang đập | Chạm và giữ |
+| 6 | 🎂 Bay vào trong trái tim, bánh kem giấu ở tâm | Lăn chuột · vuốt lên · chụm 2 ngón |
+
+### Màn 6 — cổng trái tim
+
+Trái tim hạt 3D phóng to hết cỡ giữa màn hình, chiếc bánh sinh nhật đặt đúng tâm
+nó. Lăn chuột (hoặc vuốt lên / chụm hai ngón trên điện thoại) để camera bay xuyên
+qua lớp vỏ hạt — vào tới nơi thì bữa tiệc bắt đầu.
+
+Vài điểm đáng lưu ý trong lúc dựng màn này:
+
+- Overlay hành trình vốn có nền đục để che trang tiệc phía sau. Màn này cần nhìn
+  xuyên xuống lớp WebGL nên nền phải trong suốt — kéo theo là phải giấu `.stage`
+  đi, nếu không nội dung trang tiệc sẽ lộ ra.
+- **Không cho trái tim xoay tròn ở màn này.** Trái tim 3D nhìn nghiêng chỉ còn là
+  một đám mây vô hình thù, mà cả màn sống nhờ việc nhìn RÕ đó là trái tim. Chỉ
+  đung đưa ±22° quanh mặt chính diện.
+- Cùng số hạt đó trải trên gần cả màn hình thì loãng thành bụi. Phải phóng to hạt
+  (`uSizeBoost`) chứ không phải thu nhỏ trái tim.
+- Vỏ tim chỉ nở ra ở nửa sau hành trình. Nở sớm thì hình tim nhoè ngay lúc người
+  xem đang cần nhận ra nó.
+- Bánh ở màn này có nến riêng, nên `blowAll()` / `checkAllOut()` phải giới hạn
+  phạm vi vào `#candles .candle` — quét `.candle` toàn trang thì "thổi hết nến"
+  sẽ không bao giờ đúng.
 
 **Bữa tiệc chính:**
 
@@ -152,6 +175,36 @@ làm giật khi lướt, đã xử lý hết:
 Ngoài ra trên điện thoại: lớp 3D giới hạn ~32 khung/giây (máy yếu: 26 và tắt
 bloom), trường sao 2D tắt hẳn vì đã có thiên hà WebGL, cực quang CSS ẩn đi, và
 phần tính hạt bên trong tấm thiệp dừng lại khi thiệp cuộn khỏi màn hình.
+
+### Cú khựng lúc vừa vào tiệc (chỗ bánh kem)
+
+Đây là cú giật dễ thấy nhất, và nguyên nhân nằm ở chỗ ít ai ngờ:
+
+**GPU chỉ biên dịch shader vào lần đầu tiên chúng thật sự được dùng để vẽ.** Khung
+hình WebGL đầu tiên trước đây rơi đúng vào lúc vào tiệc — nên shader của thiên hà,
+trái tim, bụi, pháo hoa cộng các lượt bloom phải biên dịch dồn trong một khung hình,
+đúng lúc tấm thiệp và bánh kem hiện ra.
+
+Cách chữa: `renderer.compile()` + một khung `composer.render()` **vô hình** ngay lúc
+trang vừa tải (mọi thứ đang ở `uOpacity = 0`), trong khi người xem còn ở màn 1 của
+hành trình. Đo được:
+
+```
+khung hình dài nhất lúc vào tiệc:  2806 ms  →  455 ms
+```
+
+Ba chỗ còn lại quanh bánh kem:
+
+- **Vòng visualizer** gọi `createRadialGradient()` mới ở *mỗi* khung hình và
+  `stroke()` riêng cho từng vạch → dựng sẵn gradient một lần, gom vạch theo màu:
+  **40 lệnh `stroke()` mỗi khung → 7**, và **0** lần cấp phát gradient.
+- **Ngọn nến** animate `transform` chu kỳ 0,28 giây với *hai* lớp `box-shadow` mờ,
+  nhân 5 ngọn → bỏ vầng mờ ngoài 34px, giãn nhịp còn 0,42 giây.
+- **Bánh kem cuộn khỏi màn hình** vẫn vẽ đủ mọi khung → dừng hẳn (đo được 0 khung).
+
+> Con số 455 ms đo trong Chrome headless dùng SwiftShader (dựng hình bằng CPU).
+> Trên GPU thật của điện thoại con số này nhỏ hơn nhiều — điều đáng tin ở đây là
+> **tỉ lệ giảm**, không phải giá trị tuyệt đối.
 
 Máy yếu được nhận diện qua `hardwareConcurrency` và `deviceMemory` để hạ thêm
 một nấc nữa.

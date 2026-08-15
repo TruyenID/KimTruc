@@ -84,6 +84,10 @@ function heartRadius(dx, dy, dz) {
 let renderer, scene, camera, composer, bloomPass;
 let galaxy, heart, dust, fireworks, gem, ring, keyLight, rimLight;
 let ok = false, active = false;
+let mode = 'idle';                            // 'idle' | 'portal' | 'party'
+let portalT = 0;                              // tiến độ bay vào cổng trái tim
+const PORTAL_SCALE = 1.35;                    // đủ to mà vẫn lọt khung, thấy trọn hình tim
+const PORTAL_POINT = 1.75;                    // hạt to hơn ở màn cổng — xem ghi chú trong portal()
 let drift = 0, pulse = 0, scrollT = 0;
 let acc = 0;                                  // dồn thời gian giữa 2 lần vẽ
 const MIN_DT = Q.fps ? 1 / Q.fps : 0;         // 0 = vẽ mọi khung hình (desktop)
@@ -234,6 +238,7 @@ function buildHeart(pal) {
             uTime: { value: 0 },
             uExplode: { value: 0 },   // 0 = nguyên vẹn, 1 = nổ hết cỡ
             uBeat: { value: 0 },   // nảy theo nhịp nhạc
+            uSizeBoost: { value: 1 },   // to hạt lên ở màn cổng cho rõ hình tim
             uDpr: { value: Math.min(devicePixelRatio || 1, Q.dpr) },
             uOpacity: { value: 0 }
         },
@@ -242,7 +247,7 @@ function buildHeart(pal) {
             attribute vec3  aDir;
             attribute float aSize;
             attribute float aPhase;
-            uniform float uTime, uExplode, uBeat, uDpr, uOpacity;
+            uniform float uTime, uExplode, uBeat, uDpr, uOpacity, uSizeBoost;
             varying vec3  vColor;
             varying float vAlpha;
             void main() {
@@ -261,7 +266,7 @@ function buildHeart(pal) {
                 vec4 mv = modelViewMatrix * vec4(p, 1.0);
                 float tw = 0.62 + 0.38 * sin(uTime * 3.0 + aPhase * 2.0);
                 vAlpha = tw * uOpacity * (1.0 - uExplode * 0.55);
-                gl_PointSize = aSize * uDpr * (110.0 / max(-mv.z, 1.0)) * (1.0 + uBeat * 0.5);
+                gl_PointSize = aSize * uDpr * uSizeBoost * (110.0 / max(-mv.z, 1.0)) * (1.0 + uBeat * 0.5);
                 gl_Position = projectionMatrix * mv;
             }
         `,
@@ -584,6 +589,29 @@ function init() {
     composer.setSize(innerWidth, innerHeight);
 
     layoutScene();
+
+    /* ⚠️ HÂM NÓNG SHADER — nguyên nhân chính của cú khựng khi vào tiệc ⚠️
+
+       GPU chỉ biên dịch shader vào lần đầu tiên chúng thật sự được dùng để vẽ.
+       Trước đây khung hình WebGL đầu tiên rơi đúng vào lúc `start()` — tức là
+       đúng lúc màn cuối kết thúc và tấm thiệp cùng bánh kem hiện ra. Toàn bộ
+       shader của thiên hà, trái tim, bụi, pháo hoa CỘNG các lượt của bloom phải
+       biên dịch dồn trong một khung hình. Đo được 2806 ms đứng hình.
+
+       Cách chữa: vẽ trước một khung ngay tại đây, lúc trang vừa tải và người xem
+       còn đang ở màn 1 của hành trình. Mọi uOpacity đang là 0 và viên ngọc đang
+       scale 0 nên khung này hoàn toàn vô hình — nhưng nó nuốt trọn chi phí biên
+       dịch. Đến lúc vào tiệc thì shader đã sẵn sàng, không còn gì phải đợi.
+
+       renderer.compile() lo phần vật liệu trong cảnh; composer.render() lo nốt
+       phần shader của các pass hậu kỳ (bloom, output) mà compile() không đụng tới. */
+    try {
+        renderer.compile(scene, camera);
+        composer.render();
+    } catch (e) {
+        /* hâm nóng thất bại cũng không sao — chỉ là mất lợi thế, cảnh vẫn chạy */
+    }
+
     addEventListener('resize', onResize, { passive: true });
 
     // Mất WebGL context (đổi GPU, tab ngủ lâu) → tắt hẳn thay vì vẽ rác
@@ -652,11 +680,69 @@ function onResize() {
 const Stage3D = {
     get ready() { return ok; },
 
-    /* Bật lớp 3D khi hành trình 5 màn kết thúc, fade in bằng GSAP nếu có */
-    start() {
-        if (!ok || active) return;
-        active = true;
+    /* ══════════════════════════════════════════════════════════════
+       CỔNG TRÁI TIM (màn 6 của hành trình)
+       ──────────────────────────────────────────────────────────────
+       Đưa trái tim ra chính giữa và phóng to hết cỡ, rồi để người xem tự
+       lăn chuột / chụm ngón tay mà bay xuyên qua lớp vỏ hạt. Ở tâm trái tim
+       là chiếc bánh sinh nhật (phần tử DOM, do script.js phóng to dần).
+       ══════════════════════════════════════════════════════════════ */
+    portal() {
+        if (!ok || mode !== 'idle') return;
+        mode = 'portal';
+        active = true;                       // bật render, dù chưa vào tiệc
+        portalT = 0;
+
+        heart.position.set(0, 0, 0);
+        heart.scale.setScalar(PORTAL_SCALE);
+        heart.material.uniforms.uExplode.value = 0;
+        /* Hạt phải to hơn hẳn ở màn này. Cùng số hạt đó trải trên gần cả màn hình
+           thì loãng ra thành bụi, không đọc ra hình trái tim nữa — mà cả màn này
+           sống nhờ việc nhìn RÕ đó là trái tim. */
+        heart.material.uniforms.uSizeBoost.value = PORTAL_POINT;
+
         const g = window.gsap;
+        const fade = [galaxy, heart].map(o => o.material.uniforms.uOpacity);
+        if (g) {
+            g.to(fade, { value: 1, duration: 1.6, stagger: 0.25, ease: 'power2.out' });
+            g.fromTo(camera.position, { z: 40 }, { z: 19, duration: 2.4, ease: 'power3.out' });
+        } else {
+            fade.forEach(u => { u.value = 1; });
+        }
+    },
+
+    /* Tiến độ bay vào, 0 = còn đứng ngoài, 1 = đã ở trong lòng trái tim */
+    portalZoom(t) { portalT = Math.max(0, Math.min(1, t)); },
+
+    /* Bật lớp 3D khi hành trình kết thúc, fade in bằng GSAP nếu có */
+    start() {
+        if (!ok || mode === 'party') return;
+        const fromPortal = mode === 'portal';
+        mode = 'party';
+        active = true;
+        layoutScene();                       // trả trái tim về lề, trả lại tỉ lệ
+
+        const g = window.gsap;
+
+        /* Đi ra từ màn cổng: mọi thứ đã hiện sẵn và camera đang nằm trong lòng
+           trái tim. Chỉ cần dãn ra trở lại, không fade từ đầu nữa. */
+        if (fromPortal) {
+            [galaxy, heart, dust].filter(Boolean)
+                .forEach(o => { o.material.uniforms.uOpacity.value = 1; });
+            const boost = heart.material.uniforms.uSizeBoost;
+            if (g) g.to(boost, { value: 1, duration: 1.4, ease: 'power2.out' });
+            else boost.value = 1;
+            if (g) {
+                g.to(heart.material.uniforms.uExplode, { value: 0, duration: 1.8, ease: 'elastic.out(1, 0.5)' });
+                g.to(camera.position, { z: 16, duration: 2.0, ease: 'power3.out' });
+                g.to(gem.scale, { x: 1, y: 1, z: 1, duration: 1.4, delay: 0.5, ease: 'elastic.out(1, 0.6)' });
+            } else {
+                heart.material.uniforms.uExplode.value = 0;
+                gem.scale.setScalar(1);
+            }
+            return;
+        }
+
         const targets = [galaxy, heart, dust].filter(Boolean).map(o => o.material.uniforms.uOpacity);
 
         if (g) {
@@ -761,27 +847,55 @@ const Stage3D = {
         const step = acc;
         acc = 0;
 
-        // Camera trôi mượt theo chuột, cộng thêm dolly theo tiến độ cuộn
-        // (hệ số làm mượt phải theo `step`, nếu không đổi nhịp vẽ là đổi cả độ trễ)
+        // Camera trôi mượt theo chuột (hệ số theo `step`, nếu không đổi nhịp vẽ
+        // là đổi luôn cả độ trễ cảm nhận được)
         const k = 1 - Math.pow(0.045, step);
         camSmooth.rx += (camTarget.rx - camSmooth.rx) * k;
         camSmooth.ry += (camTarget.ry - camSmooth.ry) * k;
-        camera.position.x = camSmooth.ry * 5.5;
-        camera.position.y = -camSmooth.rx * 4.0 - scrollT * 3.0;
-        camera.position.z = 16 + scrollT * 9;
-        camera.lookAt(0, -scrollT * 1.5, 0);
 
-        drift += (warp || 2) * step * 1.6;
+        if (mode === 'portal') {
+            /* Bay thẳng vào tâm trái tim. z đi từ 19 xuống 1 — tức là camera
+               xuyên qua hẳn lớp vỏ hạt, cho cảm giác chui vào bên trong. */
+            camera.position.x = camSmooth.ry * 1.4;
+            camera.position.y = -camSmooth.rx * 1.1;
+            camera.position.z = 19 - portalT * 18;
+            camera.lookAt(0, 0, 0);
+
+            // Càng vào sâu, vỏ tim càng nở ra nhường đường
+            heart.position.set(0, Math.sin(elapsed * 0.6) * 0.18, 0);
+            // KHÔNG xoay tròn ở màn này. Trái tim 3D nhìn nghiêng chỉ còn là một
+            // đám mây không ra hình gì — mà cả màn này sống nhờ việc nhìn RÕ đó là
+            // trái tim. Nên chỉ đung đưa ±22° quanh mặt chính diện.
+            heart.rotation.y = Math.sin(elapsed * 0.32) * 0.38;
+            heart.scale.setScalar(PORTAL_SCALE + portalT * 0.9);
+            // Chỉ nở ra ở nửa sau hành trình. Nở sớm thì vỏ tim nhoè ngay từ đầu,
+            // đúng lúc người xem đang cần nhìn rõ đó là trái tim.
+            heart.material.uniforms.uExplode.value = Math.max(0, (portalT - 0.45) / 0.55) * 0.5;
+            heart.material.uniforms.uTime.value = elapsed;
+            heart.material.uniforms.uBeat.value = pulse;
+
+            // Sao kéo thành vệt dài khi lao tới — cảm giác tốc độ
+            drift += (2 + portalT * 46) * step * 1.6;
+        } else {
+            camera.position.x = camSmooth.ry * 5.5;
+            camera.position.y = -camSmooth.rx * 4.0 - scrollT * 3.0;
+            camera.position.z = 16 + scrollT * 9;
+            camera.lookAt(0, -scrollT * 1.5, 0);
+
+            drift += (warp || 2) * step * 1.6;
+        }
         pulse *= Math.pow(0.12, step);                // nhịp tắt dần mượt
 
         galaxy.material.uniforms.uTime.value = elapsed;
         galaxy.material.uniforms.uDrift.value = drift;
         galaxy.rotation.z = elapsed * 0.012;
 
-        heart.material.uniforms.uTime.value = elapsed;
-        heart.material.uniforms.uBeat.value = pulse;
-        heart.rotation.y = elapsed * 0.22 + scrollT * Math.PI * 1.2;
-        heart.position.y = Math.sin(elapsed * 0.6) * 0.35;
+        if (mode !== 'portal') {
+            heart.material.uniforms.uTime.value = elapsed;
+            heart.material.uniforms.uBeat.value = pulse;
+            heart.rotation.y = elapsed * 0.22 + scrollT * Math.PI * 1.2;
+            heart.position.y = Math.sin(elapsed * 0.6) * 0.35;
+        }
 
         if (dust) dust.material.uniforms.uTime.value = elapsed;
 
