@@ -1,6 +1,6 @@
 # 💗 KimTruc — Website chúc mừng sinh nhật
 
-Một trang web quà tặng sinh nhật dành riêng cho người yêu: hành trình 5 màn tương tác, không gian 3D điều khiển bằng chuột / con quay hồi chuyển, pháo hoa vật lý, nhạc tự tổng hợp — tất cả chỉ bằng HTML/CSS/JS thuần, **không cần cài đặt gì cả**.
+Một trang web quà tặng sinh nhật dành riêng cho người yêu: hành trình 6 màn tương tác, không gian 3D điều khiển bằng chuột / con quay hồi chuyển, pháo hoa vật lý, nhạc tự tổng hợp — tất cả chỉ bằng HTML/CSS/JS thuần, **không cần cài đặt gì cả**.
 
 ## 🚀 Chạy thử
 
@@ -35,22 +35,37 @@ python3 -m http.server 3000
 | 3 | 🎈 Thả bóng bay mang từng chữ trong tên | Chạm từng quả |
 | 4 | 🎀 Mở hộp quà | Kéo dải ruy băng |
 | 5 | 💗 Trái tim đang đập | Chạm và giữ |
-| 6 | 🎂 Bay vào trong trái tim, bánh kem giấu ở tâm | Lăn chuột · vuốt lên · chụm 2 ngón |
+| 6 | 🎂 Ngắm quanh trái tim rồi bay vào, bánh kem giấu ở tâm | Kéo/vuốt = xoay · lăn/chụm = vào trong |
 
 ### Màn 6 — cổng trái tim
 
 Trái tim hạt 3D phóng to hết cỡ giữa màn hình, chiếc bánh sinh nhật đặt đúng tâm
-nó. Lăn chuột (hoặc vuốt lên / chụm hai ngón trên điện thoại) để camera bay xuyên
-qua lớp vỏ hạt — vào tới nơi thì bữa tiệc bắt đầu.
+nó. Hai thao tác tách bạch hẳn nhau:
+
+| Thao tác | Việc |
+|---|---|
+| Kéo chuột · vuốt 1 ngón | **Xoay quanh trái tim, trọn 360°.** Không tiến vào. |
+| Lăn chuột · xoè 2 ngón | **Bay vào trong**, nơi có bánh kem. ~20 nấc lăn / ~2 lần chụm. |
+
+Tách bạch như vậy để tha hồ ngắm quanh mà không sợ lỡ tay chui tọt vào trong.
+Bàn phím: ◀ ▶ xoay · ▲ vào · ▼ lùi ra.
+
+Xoay là xoay **camera** quanh trái tim, không phải xoay trái tim. Nhờ luôn
+`lookAt(0,0,0)` mà tâm trái tim đứng yên giữa màn hình ở mọi góc — chiếc bánh
+(phần tử DOM đặt ở giữa) vì thế luôn khớp, không cần tính toán gì thêm. Góc ngước
+bị chặn ở ±66°: tới sát cực thì `lookAt()` mất phương "lên" và hình sẽ lật úp.
 
 Vài điểm đáng lưu ý trong lúc dựng màn này:
 
 - Overlay hành trình vốn có nền đục để che trang tiệc phía sau. Màn này cần nhìn
   xuyên xuống lớp WebGL nên nền phải trong suốt — kéo theo là phải giấu `.stage`
   đi, nếu không nội dung trang tiệc sẽ lộ ra.
-- **Không cho trái tim xoay tròn ở màn này.** Trái tim 3D nhìn nghiêng chỉ còn là
-  một đám mây vô hình thù, mà cả màn sống nhờ việc nhìn RÕ đó là trái tim. Chỉ
-  đung đưa ±22° quanh mặt chính diện.
+- **Trái tim không tự xoay.** Người xem đã cầm lái vòng quay rồi, để nó tự xoay
+  nữa thì hai chuyển động chồng lên nhau nhìn rất rối. Chỉ để lại ±8° đung đưa
+  cho có sinh khí.
+- Ở góc nghiêng, camera nhìn xuyên qua nhiều lớp hạt hơn nên nền sau bánh sáng
+  rực lên và chiếc bánh gần như tan vào đó — cần một túi tối mềm
+  (`.portal-cake::before`) để bánh luôn tách ra được ở mọi góc.
 - Cùng số hạt đó trải trên gần cả màn hình thì loãng thành bụi. Phải phóng to hạt
   (`uSizeBoost`) chứ không phải thu nhỏ trái tim.
 - Vỏ tim chỉ nở ra ở nửa sau hành trình. Nở sớm thì hình tim nhoè ngay lúc người
@@ -94,7 +109,7 @@ Mở `script.js`, sửa khối `CONFIG` ở đầu file:
 const CONFIG = {
     name: 'Em Yêu',            // tên người yêu
     age: null,                 // số tuổi (null = ẩn)
-    birthday: '12-25',         // sinh nhật, dạng MM-DD
+    birthday: '12-14',         // sinh nhật 14/12, dạng MM-DD
     loveStart: '2023-02-14',   // ngày bắt đầu yêu nhau, dạng YYYY-MM-DD
 
     me: 'anh',                 // cách bạn tự xưng
@@ -122,7 +137,7 @@ Bỏ ảnh vào thư mục `photos/` với tên `1.jpg`, `2.jpg`… Chưa có �
 ### Đổi nhanh không cần sửa code
 
 ```
-index.html?name=Kim%20Trúc&age=22&date=09-15&love=2023-02-14
+index.html?name=Kim%20Trúc&age=22&date=12-14&love=2023-02-14
 ```
 
 Tham số hỗ trợ: `name`, `age`, `date`, `love`, `title`, `me`, `you`, `wish`, `letter`.
@@ -134,7 +149,7 @@ Tham số hỗ trợ: `name`, `age`, `date`, `love`, `title`, `me`, `you`, `wish
 ## 📁 Cấu trúc
 
 ```
-index.html    — khung trang, hành trình 5 màn, các mục nội dung
+index.html    — khung trang, hành trình 6 màn, các mục nội dung
 style.css     — 3 giao diện, hiệu ứng 3D, responsive, hỗ trợ giảm chuyển động
 script.js     — CONFIG + engine hạt 2D (pháo hoa, âm thanh, hành trình) + vòng lặp chính
 stage3d.js    — lớp WebGL: thiên hà, trái tim hạt, pháo hoa 3D, bloom  (ES module)

@@ -2,14 +2,14 @@
    WEBSITE CHÚC MỪNG SINH NHẬT — phiên bản CINEMATIC
    ──────────────────────────────────────────────────────────────
    TÙY CHỈNH: sửa khối CONFIG, hoặc truyền qua URL:
-     index.html?name=Mai&age=22&date=09-15
+     index.html?name=Mai&age=22&date=12-14
    ══════════════════════════════════════════════════════════════ */
 
 const CONFIG = {
     /* ── THÔNG TIN CƠ BẢN ── */
     name: 'Em Yêu',            // tên người yêu
     age: null,                 // số tuổi (null = ẩn)
-    birthday: '12-25',         // sinh nhật, dạng MM-DD
+    birthday: '12-14',         // sinh nhật 14/12, dạng MM-DD (lặp lại hằng năm)
     loveStart: '2023-02-14',   // ngày bắt đầu yêu nhau, dạng YYYY-MM-DD
     title: 'Chúc Mừng Sinh Nhật',
 
@@ -79,7 +79,7 @@ Sinh nhật {em}, {anh} không chúc điều gì to tát. Chỉ mong {em} luôn 
         { date: '20/03/2023', icon: '🤝', title: 'Lần đầu nắm tay', text: 'Tay {anh} run muốn chết mà cố tỏ ra bình tĩnh.' },
         { date: '10/06/2023', icon: '✈️', title: 'Chuyến đi đầu tiên', text: 'Nắng, biển, và {em} cười suốt chuyến.' },
         { date: '25/12/2023', icon: '🎄', title: 'Giáng sinh đầu tiên', text: 'Lạnh thật, nhưng có {em} nên ấm.' },
-        { date: 'Hôm nay', icon: '🎂', title: 'Sinh nhật {em}', text: 'Và còn rất nhiều cái sinh nhật nữa, {anh} hứa.' }
+        { date: '14/12/2026', icon: '🎂', title: 'Sinh nhật {em}', text: 'Và còn rất nhiều cái sinh nhật nữa, {anh} hứa.' }
     ],
 
     /* ── ẢNH KỶ NIỆM: bỏ ảnh vào thư mục photos/ ── */
@@ -1877,10 +1877,10 @@ function initHeartPortal() {
     buildCandles($('portalCandles'), false);      // nến trang trí, không bấm được
     window.Stage3D?.portal();
 
-    // Điện thoại không có chuột để mà lăn — phải nói đúng thao tác của họ
-    if (isTouch) {
-        hint.innerHTML = tx('Trái tim {anh} mở ra rồi, bánh {anh} giấu ở trong…<br><b>vuốt lên để bay vào</b> 💗');
-    }
+    // Nói đúng thao tác của từng loại máy, và nói cả HAI việc làm được
+    hint.innerHTML = isTouch
+        ? tx('Bánh {anh} giấu trong tim đó…<br><b>vuốt để ngắm quanh · chụm 2 ngón để vào trong</b> 💗')
+        : tx('Bánh {anh} giấu trong tim đó…<br><b>kéo để ngắm quanh · lăn chuột để vào trong</b> 💗');
 
     /* Giảm chuyển động: bỏ hẳn màn bay, một cú chạm là qua */
     if (reduceMotion) {
@@ -1931,21 +1931,51 @@ function initHeartPortal() {
         setTimeout(() => gotoScene(SCENE_COUNT + 1), 1500);   // → enterParty()
     }
 
-    /* ── Lăn chuột (desktop) ── */
+    /* ══════════ ĐIỀU KHIỂN ══════════
+       Hai thao tác tách bạch hẳn nhau:
+         · KÉO / VUỐT  → xoay quanh trái tim, trọn 360°. Không tiến vào.
+         · LĂN / CHỤM  → bay vào trong, nơi có bánh kem.
+       Nhờ tách bạch mà {em} tha hồ ngắm quanh mà không sợ lỡ tay chui tọt vào. */
+    const ORBIT_X = .0065;      // radian trên mỗi pixel kéo ngang
+    const ORBIT_Y = .0042;      // dọc nhạy hơn một chút cho đỡ chóng mặt
+
+    /* ── Lăn chuột = bay vào ──
+       ~20 nấc cho trọn hành trình; nhạy hơn nữa thì mới chạm vào bánh xe đã tới
+       nơi, chẳng kịp nhìn gì. */
     scene.addEventListener('wheel', (e) => {
         e.preventDefault();
-        // ~20 nấc lăn cho trọn hành trình bay vào. Nhạy hơn nữa thì mới chạm
-        // vào bánh xe đã tới nơi, chẳng kịp nhìn gì.
         push(e.deltaY * .00045);
     }, { passive: false });
 
-    /* ── Chụm 2 ngón để zoom, hoặc kéo 1 ngón lên (điện thoại) ── */
-    let pinch0 = 0, dragY = 0;
+    /* ── Kéo chuột = xoay quanh (desktop) ── */
+    let mDown = false, mX = 0, mY = 0, mMoved = 0;
+
+    scene.addEventListener('mousedown', (e) => {
+        mDown = true; mX = e.clientX; mY = e.clientY; mMoved = 0;
+        scene.classList.add('grabbing');
+    });
+    addEventListener('mousemove', (e) => {
+        if (!mDown || done) return;
+        const dx = e.clientX - mX, dy = e.clientY - mY;
+        mX = e.clientX; mY = e.clientY;
+        mMoved += Math.abs(dx) + Math.abs(dy);
+        window.Stage3D?.portalOrbit(dx * ORBIT_X, dy * ORBIT_Y);
+    });
+    addEventListener('mouseup', () => {
+        if (!mDown) return;
+        mDown = false;
+        scene.classList.remove('grabbing');
+        // Chạm nhẹ (không kéo) vẫn tiến vào một nấc — luôn phải có đường tới đích
+        if (mMoved < 8) push(.16);
+    });
+
+    /* ── Điện thoại: 1 ngón = xoay, 2 ngón chụm/xoè = bay vào ── */
+    let pinch0 = 0, tX = 0, tY = 0, tMoved = 0;
     const dist = (ts) => Math.hypot(ts[0].clientX - ts[1].clientX, ts[0].clientY - ts[1].clientY);
 
     scene.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 2) pinch0 = dist(e.touches);
-        else dragY = e.touches[0].clientY;
+        if (e.touches.length === 2) { pinch0 = dist(e.touches); }
+        else { tX = e.touches[0].clientX; tY = e.touches[0].clientY; tMoved = 0; }
     }, { passive: true });
 
     scene.addEventListener('touchmove', (e) => {
@@ -1953,21 +1983,29 @@ function initHeartPortal() {
         e.preventDefault();
         if (e.touches.length === 2) {
             const d = dist(e.touches);
-            if (pinch0) push((d - pinch0) * .004);    // xoè ra = phóng to = bay vào
+            if (pinch0) push((d - pinch0) * .0018);   // xoè hai ngón = bay vào (~2 lần chụm)
             pinch0 = d;
         } else {
-            const y = e.touches[0].clientY;
-            push((dragY - y) * .0022);                // kéo lên = bay vào (~1,5 lần vuốt)
-            dragY = y;
+            const p = e.touches[0];
+            const dx = p.clientX - tX, dy = p.clientY - tY;
+            tX = p.clientX; tY = p.clientY;
+            tMoved += Math.abs(dx) + Math.abs(dy);
+            window.Stage3D?.portalOrbit(dx * ORBIT_X, dy * ORBIT_Y);   // vuốt = xoay
         }
     }, { passive: false });
 
-    /* ── Bàn phím + chạm đơn: luôn phải có đường đi tới đích ── */
+    scene.addEventListener('touchend', (e) => {
+        if (e.touches.length === 0 && tMoved < 10) push(.16);          // chạm nhẹ = tiến vào
+        pinch0 = 0;
+    }, { passive: true });
+
+    /* ── Bàn phím ── */
     scene.addEventListener('keydown', (e) => {
         if (['ArrowUp', 'Enter', ' '].includes(e.key)) { e.preventDefault(); push(.2); }
-        if (e.key === 'ArrowDown') { e.preventDefault(); push(-.2); }
+        else if (e.key === 'ArrowDown') { e.preventDefault(); push(-.2); }
+        else if (e.key === 'ArrowLeft') { e.preventDefault(); window.Stage3D?.portalOrbit(-.35, 0); }
+        else if (e.key === 'ArrowRight') { e.preventDefault(); window.Stage3D?.portalOrbit(.35, 0); }
     });
-    scene.addEventListener('click', () => push(.16));
     scene.tabIndex = 0;
 }
 

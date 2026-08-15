@@ -86,6 +86,11 @@ let galaxy, heart, dust, fireworks, gem, ring, keyLight, rimLight;
 let ok = false, active = false;
 let mode = 'idle';                            // 'idle' | 'portal' | 'party'
 let portalT = 0;                              // tiến độ bay vào cổng trái tim
+/* Góc nhìn quanh trái tim ở màn cổng. Kéo/vuốt xoay CAMERA quanh trái tim chứ
+   không xoay trái tim — nhờ vậy tâm tim luôn rơi đúng giữa màn hình, và chiếc
+   bánh (phần tử DOM đặt ở giữa) vẫn khớp ở mọi góc nhìn. */
+const orbit = { yaw: 0, pitch: 0, yawT: 0, pitchT: 0 };
+const PITCH_MAX = 1.15;                       // ~66°, chừa biên để không lật qua cực
 const PORTAL_SCALE = 1.35;                    // đủ to mà vẫn lọt khung, thấy trọn hình tim
 const PORTAL_POINT = 1.75;                    // hạt to hơn ở màn cổng — xem ghi chú trong portal()
 let drift = 0, pulse = 0, scrollT = 0;
@@ -693,6 +698,7 @@ const Stage3D = {
         active = true;                       // bật render, dù chưa vào tiệc
         portalT = 0;
 
+        orbit.yaw = orbit.yawT = orbit.pitch = orbit.pitchT = 0;   // bắt đầu từ chính diện
         heart.position.set(0, 0, 0);
         heart.scale.setScalar(PORTAL_SCALE);
         heart.material.uniforms.uExplode.value = 0;
@@ -713,6 +719,15 @@ const Stage3D = {
 
     /* Tiến độ bay vào, 0 = còn đứng ngoài, 1 = đã ở trong lòng trái tim */
     portalZoom(t) { portalT = Math.max(0, Math.min(1, t)); },
+
+    /* Xoay quanh trái tim. yaw quay tròn không giới hạn (trọn 360° và hơn nữa),
+       pitch bị chặn ở ±66°: tới sát cực thì lookAt() mất phương "lên" và hình
+       sẽ lật úp đột ngột. */
+    portalOrbit(dYaw, dPitch) {
+        if (!ok || mode !== 'portal') return;
+        orbit.yawT += dYaw;
+        orbit.pitchT = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, orbit.pitchT + dPitch));
+    },
 
     /* Bật lớp 3D khi hành trình kết thúc, fade in bằng GSAP nếu có */
     start() {
@@ -854,19 +869,28 @@ const Stage3D = {
         camSmooth.ry += (camTarget.ry - camSmooth.ry) * k;
 
         if (mode === 'portal') {
-            /* Bay thẳng vào tâm trái tim. z đi từ 19 xuống 1 — tức là camera
-               xuyên qua hẳn lớp vỏ hạt, cho cảm giác chui vào bên trong. */
-            camera.position.x = camSmooth.ry * 1.4;
-            camera.position.y = -camSmooth.rx * 1.1;
-            camera.position.z = 19 - portalT * 18;
+            /* Camera nằm trên một mặt cầu quanh trái tim. Bán kính đi từ 19 xuống
+               1 theo tiến độ zoom — tức là xuyên qua hẳn lớp vỏ hạt vào bên trong.
+               Góc thì do người xem kéo. Vì luôn lookAt(0,0,0) nên tâm trái tim
+               đứng yên giữa màn hình ở mọi góc, chiếc bánh DOM nhờ đó luôn khớp. */
+            orbit.yaw += (orbit.yawT - orbit.yaw) * k;
+            orbit.pitch += (orbit.pitchT - orbit.pitch) * k;
+
+            const r = 19 - portalT * 18;
+            const cp = Math.cos(orbit.pitch), sp2 = Math.sin(orbit.pitch);
+            camera.position.set(
+                r * cp * Math.sin(orbit.yaw),
+                r * sp2,
+                r * cp * Math.cos(orbit.yaw)
+            );
             camera.lookAt(0, 0, 0);
 
             // Càng vào sâu, vỏ tim càng nở ra nhường đường
             heart.position.set(0, Math.sin(elapsed * 0.6) * 0.18, 0);
-            // KHÔNG xoay tròn ở màn này. Trái tim 3D nhìn nghiêng chỉ còn là một
-            // đám mây không ra hình gì — mà cả màn này sống nhờ việc nhìn RÕ đó là
-            // trái tim. Nên chỉ đung đưa ±22° quanh mặt chính diện.
-            heart.rotation.y = Math.sin(elapsed * 0.32) * 0.38;
+            // Trái tim tự nó đứng yên — người xem đã cầm lái vòng quay rồi. Chỉ
+            // để lại chút đung đưa ±8° cho có sinh khí, xoay nhiều nữa thì hai
+            // chuyển động chồng lên nhau, nhìn rối.
+            heart.rotation.y = Math.sin(elapsed * 0.32) * 0.14;
             heart.scale.setScalar(PORTAL_SCALE + portalT * 0.9);
             // Chỉ nở ra ở nửa sau hành trình. Nở sớm thì vỏ tim nhoè ngay từ đầu,
             // đúng lúc người xem đang cần nhìn rõ đó là trái tim.

@@ -2837,6 +2837,20 @@ html.portal-open .stage {
     will-change: transform, opacity;
 }
 
+/* Túi tối mềm phía sau bánh. Khi xoay sang góc nghiêng, camera nhìn xuyên qua
+   nhiều lớp hạt hơn nên nền sau bánh sáng rực lên và chiếc bánh gần như tan vào
+   đó. Lớp này giữ cho bánh luôn tách ra được, ở mọi góc nhìn. */
+.portal-cake::before {
+    content: "";
+    position: absolute;
+    inset: -20% -26%;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at 50% 58%,
+            rgba(6, 3, 14, .78), rgba(6, 3, 14, .4) 54%, rgba(6, 3, 14, 0) 74%);
+    z-index: -1;
+    pointer-events: none;
+}
+
 .portal-hint {
     position: absolute;
     left: 50%;
@@ -2904,4 +2918,13 @@ html.portal-open .stage {
         transform: translate(-50%, -50%) scale(1);
         opacity: 1;
     }
+}
+
+/* Con trỏ báo hiệu kéo được để xoay quanh trái tim */
+.scene-portal {
+    cursor: grab;
+}
+
+.scene-portal.grabbing {
+    cursor: grabbing;
 }
