@@ -137,6 +137,25 @@ khung hình của nhau và làm giật.
 CDN hỏng, người dùng bật giảm chuyển động) — `script.js` không bao giờ phụ thuộc
 vào chúng, chỉ gọi qua `window.Stage3D?.…`.
 
+## 📱 Ưu tiên điện thoại
+
+Trang được chỉnh để **cuộn mượt trên điện thoại** là ưu tiên số một. Bốn thứ hay
+làm giật khi lướt, đã xử lý hết:
+
+| Thủ phạm | Vì sao giật | Cách xử lý |
+|---|---|---|
+| `backdrop-filter` trên panel | Phải chụp lại nền rồi làm mờ **mỗi khung hình** khi cuộn, vì nền sau tấm kính vừa đổi | Bỏ hẳn trên cảm ứng, thay bằng nền đục hơn |
+| Sự kiện `resize` giả | Thanh địa chỉ trượt lên/xuống lúc cuộn → dựng lại trường sao + cấp phát lại render target giữa chừng | Bỏ qua nếu chiều rộng không đổi; bật `ignoreMobileResize` |
+| Animation "scrub" | Ghi transform cho 10 phần tử ở mọi khung hình cuộn | Còn đúng 1 (thiệp mờ dần bằng `opacity`) |
+| Số điểm ảnh phải tô | `dpr 1.5` + bloom quét nhiều lượt toàn khung hình | Hạ `dpr` về 1 → **giảm 2,25× số điểm ảnh**, nhân với số lượt bloom |
+
+Ngoài ra trên điện thoại: lớp 3D giới hạn ~32 khung/giây (máy yếu: 26 và tắt
+bloom), trường sao 2D tắt hẳn vì đã có thiên hà WebGL, cực quang CSS ẩn đi, và
+phần tính hạt bên trong tấm thiệp dừng lại khi thiệp cuộn khỏi màn hình.
+
+Máy yếu được nhận diện qua `hardwareConcurrency` và `deviceMemory` để hạ thêm
+một nấc nữa.
+
 ## 📱 Hỗ trợ
 
 Chrome / Edge / Firefox / Safari, cả máy tính lẫn điện thoại. Có hồ sơ hiệu năng riêng cho máy yếu, rung phản hồi trên Android, safe-area cho tai thỏ iPhone, và tôn trọng `prefers-reduced-motion`.

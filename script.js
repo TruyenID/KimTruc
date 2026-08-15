@@ -156,6 +156,10 @@ window.__BD = { PERF, reduceMotion, isSmall, isTouch, palette: CONFIG.palette };
 /* Lớp WebGL có mặt hay không — quyết định mật độ sao 2D để hai lớp không chồng nhau */
 const has3D = () => !!(window.Stage3D && window.Stage3D.ready);
 
+/* Cờ tiết kiệm cho điện thoại (bật lúc vào tiệc, xem enterParty) */
+let bg2dOff = false;      // tắt hẳn trường sao 2D — thiên hà WebGL đã thay thế
+let cardVisible = true;   // thiệp còn trong tầm nhìn không
+
 /* Rung nhẹ phản hồi trên điện thoại (Android) */
 function buzz(pattern) {
     if (isTouch && navigator.vibrate) { try { navigator.vibrate(pattern); } catch (e) { } }
@@ -835,9 +839,16 @@ function loop(ts) {
     cam.ry += (targetCam.ry - cam.ry) * .055;
     warp += (2 - warp) * .02;
 
-    drawStars();
-    drawViz(ts);
-    drawNameParticles(ts);
+    // Trên điện thoại khi đã có thiên hà WebGL, trường sao 2D là một lớp phủ
+    // toàn màn hình vẽ thừa — bỏ hẳn, tiết kiệm cả lượt vẽ lẫn lượt ghép lớp.
+    if (!bg2dOff) drawStars();
+
+    // Vòng visualizer và tên ghép từ hạt đều nằm TRONG tấm thiệp. Cuộn qua rồi
+    // thì không ai thấy, nhưng vòng lặp vẫn chạy đủ mọi phép tính cho từng hạt.
+    if (cardVisible) {
+        drawViz(ts);
+        drawNameParticles(ts);
+    }
 
     fxx.clearRect(0, 0, innerWidth, innerHeight);
 
@@ -1816,7 +1827,24 @@ function enterParty() {
 
     // Bật lớp WebGL, rồi dựng lại sao 2D với mật độ thưa cho khỏi chồng lớp
     window.Stage3D?.start();
-    if (has3D()) buildStars();
+    if (has3D()) {
+        buildStars();
+        if (isSmall) {                       // điện thoại: nhường hẳn nền cho WebGL
+            bg2dOff = true;
+            stars = []; shootingStars = [];
+            bgx.clearRect(0, 0, innerWidth, innerHeight);
+            bg.style.display = 'none';
+        }
+    }
+
+    // Ngừng tính hạt trong thiệp khi thiệp đã cuộn ra khỏi màn hình
+    if ('IntersectionObserver' in window) {
+        new IntersectionObserver(
+            ([e]) => { cardVisible = e.isIntersecting; },
+            { rootMargin: '120px' }
+        ).observe($('card'));
+    }
+
     document.dispatchEvent(new CustomEvent('party:start'));   // choreo.js đo lại mốc cuộn
 
     initGyro();
@@ -1855,12 +1883,26 @@ function init() {
         });
     }
 
-    let resizeT;
+    /* ⚠️ THỦ PHẠM GÂY GIẬT SỐ 1 TRÊN ĐIỆN THOẠI ⚠️
+       Khi {em} lướt trang, thanh địa chỉ của trình duyệt trượt lên rồi trượt xuống.
+       Mỗi lần như vậy trình duyệt bắn ra sự kiện `resize` — CHIỀU RỘNG KHÔNG ĐỔI,
+       chỉ chiều cao thay đổi vài chục pixel. Handler cũ nghe thấy là dựng lại toàn
+       bộ trường sao + vật thể trôi nổi + đổi kích thước canvas, ngay giữa lúc đang
+       cuộn. Đó chính là những cú khựng.
+
+       Chỉ xử lý khi chiều rộng thật sự đổi (xoay ngang máy), hoặc chiều cao đổi
+       nhiều hơn mức thanh địa chỉ có thể gây ra. */
+    let resizeT, lastW = innerWidth, lastH = innerHeight;
     addEventListener('resize', () => {
+        const dw = Math.abs(innerWidth - lastW);
+        const dh = Math.abs(innerHeight - lastH);
+        if (dw === 0 && dh < 140) return;          // chỉ là thanh địa chỉ → lờ đi
+        lastW = innerWidth; lastH = innerHeight;
+
         sizeCanvas(bg); sizeCanvas(fx); buildStars(); buildFloaters();
         clearTimeout(resizeT);
         resizeT = setTimeout(buildNameParticles, 250);
-    });
+    }, { passive: true });
 
     // — Hành trình —
     buildDots();

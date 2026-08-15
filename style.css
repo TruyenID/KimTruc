@@ -2556,16 +2556,61 @@ html[data-theme="luxe"] .fortune-front {
 /* ═══ Thiết bị cảm ứng: giảm hiệu ứng nặng, bỏ hover dính ═══ */
 @media (hover: none) {
 
-    /* blur lớn rất tốn GPU trên điện thoại */
+    /* ⚠️ THỦ PHẠM GÂY GIẬT SỐ 2 KHI CUỘN ⚠️
+       `backdrop-filter` bắt trình duyệt chụp lại vùng nền phía sau rồi làm mờ —
+       và phải làm lại TỪ ĐẦU MỖI KHUNG HÌNH khi trang cuộn, vì nền sau tấm kính
+       vừa đổi. Với 8 panel cùng lúc trên màn hình thì máy không kịp thở.
+       Hạ bán kính blur không giải quyết được gì: cái đắt là thao tác chụp-và-mờ,
+       không phải độ lớn bán kính. Nên trên điện thoại bỏ hẳn, đổi sang nền đục
+       hơn một chút. Vẫn thấy trời sao phía sau, mà cuộn thì mượt hẳn. */
     .card::before,
-    .panel {
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
+    .panel,
+    .icon-btn,
+    .lightbox {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
     }
 
+    /* Không còn kính mờ thì nền phải đục thêm, nếu không chữ sẽ chìm vào trời sao.
+       Xếp lớp màu nền của chủ đề xuống dưới lớp panel bán trong suốt sẵn có —
+       cách này chạy trên mọi trình duyệt, không cần color-mix. */
+    .panel {
+        background:
+            linear-gradient(var(--panel-bg), var(--panel-bg)),
+            linear-gradient(color-mix(in srgb, var(--bg-1) 80%, transparent),
+                color-mix(in srgb, var(--bg-1) 80%, transparent));
+    }
+
+    .card::before {
+        background:
+            linear-gradient(var(--card-bg), var(--card-bg)),
+            linear-gradient(color-mix(in srgb, var(--bg-1) 76%, transparent),
+                color-mix(in srgb, var(--bg-1) 76%, transparent));
+    }
+
+    /* Trình duyệt chưa hỗ trợ color-mix: dùng nền đặc của chủ đề làm lớp lót */
+    @supports not (color: color-mix(in srgb, red 50%, blue)) {
+
+        .panel {
+            background: linear-gradient(var(--panel-bg), var(--panel-bg)),
+                linear-gradient(var(--bg-1), var(--bg-1));
+        }
+
+        .card::before {
+            background: linear-gradient(var(--card-bg), var(--card-bg)),
+                linear-gradient(var(--bg-1), var(--bg-1));
+        }
+    }
+
+    /* Aurora là 3 khối mờ 70px nằm đè lên nhau — cũng phải tô lại khi cuộn.
+       Đã có thiên hà WebGL phía sau rồi nên hạ mạnh, gần như không mất gì. */
     .aurora {
-        filter: blur(46px);
-        opacity: .45;
+        filter: blur(38px);
+        opacity: .3;
+    }
+
+    .has-3d .aurora {
+        display: none;
     }
 
     .icon-btn {
@@ -2687,4 +2732,37 @@ html[data-theme="luxe"] .fortune-front {
         opacity: 1 !important;
         transform: none !important;
     }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ƯU TIÊN ĐIỆN THOẠI — gỡ bớt gánh nặng khi cuộn
+   Khối này phải nằm CUỐI FILE để ghi đè các rule .js-gsap phía trên
+   (cùng độ đặc hiệu thì rule đứng sau thắng).
+   ══════════════════════════════════════════════════════════════ */
+@media (hover: none) {
+
+    /* `will-change` tạo hẳn một lớp compositor riêng cho mỗi phần tử. Trên
+       desktop thì đáng, nhưng ở đây có tới hơn chục nút — từng đó lớp ăn bộ nhớ
+       GPU của điện thoại, và chính lúc cuộn là lúc thiếu bộ nhớ nhất.
+       Hiệu ứng nút từ tính vốn cũng đã tắt trên cảm ứng rồi. */
+    .js-gsap .btn,
+    .js-gsap .icon-btn {
+        will-change: auto;
+    }
+
+    /* preserve-3d dựng một ngữ cảnh 3D riêng, buộc trình duyệt sắp xếp lại
+       chiều sâu của mọi phần tử con mỗi lần vẽ. Các reveal trên điện thoại
+       chỉ dùng opacity + trượt dọc nên không cần tới nó. */
+    .js-gsap .panel,
+    .js-gsap .gallery,
+    .js-gsap .timeline {
+        transform-style: flat;
+    }
+
+    /* CỐ Ý KHÔNG dùng `content-visibility: auto` ở đây. Nó bỏ qua phần dựng hình
+       của các mục ngoài màn hình — nghe thì hợp lý, nhưng khi đó
+       getBoundingClientRect() trả về chiều cao ƯỚC LƯỢNG chứ không phải chiều cao
+       thật, mà ScrollTrigger lại dựa đúng vào hàm đó để đặt mốc. Kết quả là các
+       mục reveal sai chỗ. Đổi một chút hiệu năng lấy nguy cơ hỏng reveal là không
+       đáng, nhất là khi các panel ở đây vốn đã nhẹ. */
 }

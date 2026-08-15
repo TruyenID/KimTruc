@@ -29,11 +29,22 @@ const BD = window.__BD || {};
 const reduceMotion = BD.reduceMotion ?? matchMedia('(prefers-reduced-motion: reduce)').matches;
 const isSmall = BD.isSmall ?? matchMedia('(pointer: coarse)').matches;
 
+/* ── NGÂN SÁCH THEO THIẾT BỊ (ưu tiên điện thoại) ──
+   Trên điện thoại, thứ đắt nhất KHÔNG phải số lượng hạt mà là số điểm ảnh phải
+   tô. Các hệ hạt đều dùng additive blending, tức là mỗi hạt chồng lên nhau đều
+   phải tô lại — cộng thêm bloom quét nhiều lượt trên toàn khung hình nữa.
+   Nên đòn bẩy mạnh nhất là hạ `dpr`: từ 1.5 xuống 1.0 cắt gần một nửa số điểm
+   ảnh, mà mắt gần như không nhận ra vì cảnh toàn đốm sáng nhoè. */
 const Q = isSmall
-    ? { stars: 5200, heart: 3400, dust: 260, fw: 1400, dpr: 1.5, bloom: true, glass: false }
-    : { stars: 14000, heart: 9000, dust: 700, fw: 3600, dpr: 2, bloom: true, glass: true };
+    ? { stars: 3600, heart: 2600, dust: 0, fw: 900, dpr: 1, bloom: true, glass: false, fps: 32 }
+    : { stars: 14000, heart: 9000, dust: 700, fw: 3600, dpr: 2, bloom: true, glass: true, fps: 0 };
 
 if (reduceMotion) { Q.stars = 2600; Q.heart = 2200; Q.dust = 0; Q.fw = 600; }
+
+/* Điện thoại yếu (ít nhân CPU / ít RAM) → hạ tiếp một nấc, tắt hẳn bloom */
+if (isSmall && ((navigator.hardwareConcurrency || 4) <= 4 || (navigator.deviceMemory || 4) <= 3)) {
+    Q.stars = 2200; Q.heart = 1800; Q.fw = 600; Q.bloom = false; Q.fps = 26;
+}
 
 /* ══════════ BẢNG MÀU CHO 3 GIAO DIỆN ══════════ */
 const THEME3D = {
@@ -74,6 +85,8 @@ let renderer, scene, camera, composer, bloomPass;
 let galaxy, heart, dust, fireworks, gem, ring, keyLight, rimLight;
 let ok = false, active = false;
 let drift = 0, pulse = 0, scrollT = 0;
+let acc = 0;                                  // dồn thời gian giữa 2 lần vẽ
+const MIN_DT = Q.fps ? 1 / Q.fps : 0;         // 0 = vẽ mọi khung hình (desktop)
 const camTarget = { rx: 0, ry: 0 };
 const camSmooth = { rx: 0, ry: 0 };
 
@@ -612,8 +625,19 @@ function layoutScene() {
     heart.position.x = home.heartX;
 }
 
+/* Cùng lý do với handler resize bên script.js: thanh địa chỉ trên điện thoại
+   trượt lên xuống là bắn resize. Ở đây còn đắt hơn nhiều — setSize() cấp phát
+   lại toàn bộ render target của composer và của bloom. Làm việc đó giữa lúc
+   đang cuộn thì chắc chắn khựng. Chiều rộng không đổi thì bỏ qua. */
+let lastW3D = innerWidth, lastH3D = innerHeight;
+
 function onResize() {
     if (!ok) return;
+    const dw = Math.abs(innerWidth - lastW3D);
+    const dh = Math.abs(innerHeight - lastH3D);
+    if (dw === 0 && dh < 140) return;
+    lastW3D = innerWidth; lastH3D = innerHeight;
+
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
@@ -728,16 +752,27 @@ const Stage3D = {
     render(dt, elapsed, warp) {
         if (!ok || !active) return;
 
+        /* ── Giới hạn nhịp vẽ trên điện thoại ──
+           Thiên hà trôi rất chậm nên 30 khung/giây là thừa đẹp, mà GPU chỉ phải
+           làm một nửa việc. Phần sức để dành đó chính là thứ giữ cho thao tác
+           cuộn mượt. Vẫn cộng dồn dt để vật lý pháo hoa không bị chậm lại. */
+        acc += dt;
+        if (MIN_DT && acc < MIN_DT) return;
+        const step = acc;
+        acc = 0;
+
         // Camera trôi mượt theo chuột, cộng thêm dolly theo tiến độ cuộn
-        camSmooth.rx += (camTarget.rx - camSmooth.rx) * 0.05;
-        camSmooth.ry += (camTarget.ry - camSmooth.ry) * 0.05;
+        // (hệ số làm mượt phải theo `step`, nếu không đổi nhịp vẽ là đổi cả độ trễ)
+        const k = 1 - Math.pow(0.045, step);
+        camSmooth.rx += (camTarget.rx - camSmooth.rx) * k;
+        camSmooth.ry += (camTarget.ry - camSmooth.ry) * k;
         camera.position.x = camSmooth.ry * 5.5;
         camera.position.y = -camSmooth.rx * 4.0 - scrollT * 3.0;
         camera.position.z = 16 + scrollT * 9;
         camera.lookAt(0, -scrollT * 1.5, 0);
 
-        drift += (warp || 2) * dt * 1.6;
-        pulse *= Math.pow(0.12, dt);                  // nhịp tắt dần mượt
+        drift += (warp || 2) * step * 1.6;
+        pulse *= Math.pow(0.12, step);                // nhịp tắt dần mượt
 
         galaxy.material.uniforms.uTime.value = elapsed;
         galaxy.material.uniforms.uDrift.value = drift;
@@ -758,7 +793,7 @@ const Stage3D = {
         gem.position.y = Math.sin(elapsed * 0.7) * 1.2 + 1.5;
         ring.rotation.z = -elapsed * 0.8;
 
-        stepFireworks(dt);
+        stepFireworks(step);
         composer.render();
     },
 

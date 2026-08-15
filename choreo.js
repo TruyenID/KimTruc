@@ -19,8 +19,16 @@
     g.registerPlugin(ST);
 
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const touch = matchMedia('(pointer: coarse)').matches;
     const root = document.documentElement;
     root.classList.add('js-gsap');
+
+    /* ── Cấu hình ưu tiên điện thoại ──
+       ignoreMobileResize: thanh địa chỉ trượt lên/xuống khi cuộn sẽ bắn ra sự
+         kiện resize; mặc định ScrollTrigger nghe thấy là đo lại TOÀN BỘ mốc của
+         cả 32 trigger — ngay giữa lúc đang cuộn. Cờ này bảo nó lờ đi.
+       limitCallbacks: chỉ gọi callback ở đúng ranh giới thay vì mọi khung hình. */
+    ST.config({ ignoreMobileResize: true, limitCallbacks: true });
 
     /* Giảm chuyển động: hiện mọi thứ ra ngay, bỏ hết hiệu ứng cuộn */
     if (reduce) {
@@ -79,7 +87,12 @@
             }
         );
 
-        // Trôi nhẹ ngược chiều cuộn → lưới ảnh có chiều sâu thật
+        // Trôi nhẹ ngược chiều cuộn → lưới ảnh có chiều sâu thật.
+        // Đây là animation "scrub": nó ghi transform cho 6 tấm ảnh ở MỌI khung
+        // hình trong suốt lúc cuộn. Trên điện thoại thì bỏ — cái giá phải trả là
+        // độ mượt, mà hiệu ứng thì gần như không ai để ý trên màn hình nhỏ.
+        if (touch) return;
+
         photos.forEach((p, i) => {
             g.to(p, {
                 y: (i % 2 ? -1 : 1) * 26, ease: 'none',
@@ -121,6 +134,17 @@
         const card = document.getElementById('card');
         if (!card) return;
 
+        // Trên điện thoại chỉ mờ dần: `opacity` do compositor lo, gần như miễn phí.
+        // Còn scale/rotateX ép vẽ lại cả tấm thiệp (rất nhiều phần tử con) mỗi
+        // khung hình cuộn — đó mới là thứ làm khựng.
+        if (touch) {
+            g.to(card, {
+                opacity: 0.6, ease: 'none',
+                scrollTrigger: { trigger: card, start: 'top top', end: 'bottom top', scrub: true }
+            });
+            return;
+        }
+
         g.to(card, {
             y: -60, scale: 0.94, opacity: 0.55, rotateX: 8,
             transformPerspective: 1200, transformOrigin: 'center top', ease: 'none',
@@ -130,6 +154,10 @@
 
     /* ══════════ 7. CỰC QUANG NỀN — 3 lớp trôi lệch tốc độ ══════════ */
     function auroraParallax() {
+        // Aurora là 3 khối blur 70px. Đẩy chúng đi khi cuộn là bắt trình duyệt
+        // làm mờ lại từ đầu mỗi khung hình. Trên điện thoại đã ẩn hẳn (xem CSS).
+        if (touch) return;
+
         const blobs = g.utils.toArray('.aurora-blob');
         blobs.forEach((b, i) => {
             g.to(b, {
