@@ -2620,3 +2620,71 @@ html[data-theme="luxe"] .fortune-front {
         transform: none;
     }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   LỚP 3D + BÀN GIAO ANIMATION CHO GSAP
+   (đi kèm stage3d.js và choreo.js)
+   ══════════════════════════════════════════════════════════════ */
+
+/* Canvas WebGL nằm giữa: trên sao 2D (z1), dưới nội dung (z5+).
+   Nhờ vậy thiên hà và pháo hoa 3D tạo chiều sâu phía sau tấm thiệp,
+   còn kim tuyến 2D (#fxCanvas, z6) vẫn bay phía trước như cũ. */
+#glCanvas {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 1.6s ease-out;
+}
+
+.has-3d #glCanvas {
+    opacity: 1;
+}
+
+/* Có thiên hà WebGL rồi thì hạ bớt cực quang CSS, tránh nền bị bệt sáng */
+.has-3d .aurora {
+    opacity: .32;
+}
+
+/* ── Bàn giao: khi GSAP lên, CSS transition phải im lặng ──
+   Hai hệ cùng ghi transform/opacity lên một phần tử sẽ đá nhau và giật hình.
+   Không có GSAP (CDN hỏng, JS tắt) thì các rule gốc phía trên vẫn nguyên vẹn. */
+.js-gsap .panel,
+.js-gsap .tl-item {
+    transition: none;
+}
+
+/* Giữ lại transition đổ bóng cho hover, nhả transform ra cho GSAP */
+.js-gsap .photo {
+    transition: box-shadow .35s;
+}
+
+/* Các phần tử GSAP sẽ animate cần lớp dựng 3D riêng để rotateX/Y có chiều sâu */
+.js-gsap .panel,
+.js-gsap .gallery,
+.js-gsap .timeline {
+    transform-style: preserve-3d;
+}
+
+/* Nút có từ tính: GSAP ghi x/y nên translate của CSS phải tránh đường */
+.js-gsap .btn,
+.js-gsap .icon-btn {
+    will-change: transform;
+}
+
+/* ── Tôn trọng "giảm chuyển động" ── */
+@media (prefers-reduced-motion: reduce) {
+
+    #glCanvas {
+        transition: none;
+    }
+
+    .js-gsap .panel,
+    .js-gsap .tl-item,
+    .js-gsap .photo,
+    .js-gsap .fortune {
+        opacity: 1 !important;
+        transform: none !important;
+    }
+}

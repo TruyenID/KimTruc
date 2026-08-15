@@ -150,6 +150,12 @@ const PERF = isSmall
     ? { starDensity: 15000, burst: .55, confetti: .55, dpr: 1.5, trail: .6, vizBars: 40 }
     : { starDensity: 8000, burst: 1, confetti: 1, dpr: 2, trail: 1, vizBars: 56 };
 
+/* Chia sẻ hồ sơ thiết bị sang stage3d.js (module chạy sau file này) */
+window.__BD = { PERF, reduceMotion, isSmall, isTouch, palette: CONFIG.palette };
+
+/* Lớp WebGL có mặt hay không — quyết định mật độ sao 2D để hai lớp không chồng nhau */
+const has3D = () => !!(window.Stage3D && window.Stage3D.ready);
+
 /* Rung nhẹ phản hồi trên điện thoại (Android) */
 function buzz(pattern) {
     if (isTouch && navigator.vibrate) { try { navigator.vibrate(pattern); } catch (e) { } }
@@ -203,7 +209,10 @@ function resetStar(s, init = false) {
 }
 
 function buildStars() {
-    const count = Math.round(innerWidth * innerHeight / PERF.starDensity);
+    // Khi thiên hà WebGL đã bật, giảm mạnh sao 2D: giữ lại chút lấp lánh gần
+    // mà không làm dày đặc chồng lên lớp 3D phía sau.
+    const density = has3D() ? PERF.starDensity * 3.2 : PERF.starDensity;
+    const count = Math.round(innerWidth * innerHeight / density);
     stars = Array.from({ length: count }, () => resetStar({}, true));
 }
 
@@ -392,6 +401,13 @@ class Rocket {
 
 /* Các kiểu nổ 3D: cầu hoa cúc / trái tim / liễu rủ vàng / vành đai nghiêng kiểu sao Thổ */
 function burst(X, Y, Z, color, big = false) {
+    // Nổ song song một quả cầu WebGL có bloom ở đúng vị trí — lớp 2D lo hình
+    // dáng (tim, liễu rủ…), lớp 3D lo độ sáng và chiều sâu.
+    if (window.Stage3D) {
+        const p = project(X, Y, Z);
+        window.Stage3D.burst(p.x, p.y, color, big);
+    }
+
     const style = Math.random();
     const n = Math.round((reduceMotion ? 24 : 70) * PERF.burst * (big ? 1.5 : 1));
 
@@ -550,6 +566,9 @@ function beep(freq, dur = .2, type = 'sine', vol = .12) {
     g.gain.exponentialRampToValueAtTime(.0001, t + dur);
     o.connect(g).connect(mixBus);
     o.start(t); o.stop(t + dur + .02);
+
+    // Mỗi nốt nhạc làm trái tim 3D nảy một cái — mạnh yếu theo âm lượng nốt
+    window.Stage3D?.beat(Math.min(vol / .12, 1.4));
 }
 
 /* Tiếng "bùm" pháo hoa bằng nhiễu trắng lọc thấp */
@@ -797,12 +816,20 @@ function explodeName() {
         p.vx += rand(-9, 9);
         p.vy += rand(-9, 9);
     }
+    window.Stage3D?.explodeHeart();     // trái tim 3D vỡ tung rồi tự ghép lại
     beep(rand(600, 900), .15, 'triangle', .07);
 }
 
-/* ══════════ VÒNG LẶP CHÍNH ══════════ */
-let lastAuto = 0;
+/* ══════════ VÒNG LẶP CHÍNH ══════════
+   MỘT vòng requestAnimationFrame duy nhất cho cả trang: engine hạt 2D
+   ở đây, và lớp WebGL được gọi nhờ ở cuối. Hai render loop song song
+   sẽ tranh nhau khung hình và làm giật — nên chỉ có đúng một. */
+let lastAuto = 0, lastTs = 0;
 function loop(ts) {
+    // dt tính bằng giây, chặn trần 50ms để lúc chuyển tab về không bị "nhảy cóc"
+    const dt = lastTs ? Math.min((ts - lastTs) / 1000, .05) : .016;
+    lastTs = ts;
+
     // làm mượt chuyển động camera + giảm dần tốc độ warp
     cam.rx += (targetCam.rx - cam.rx) * .055;
     cam.ry += (targetCam.ry - cam.ry) * .055;
@@ -840,9 +867,16 @@ function loop(ts) {
     fxx.globalAlpha = 1;
 
     // Trên điện thoại: thiệp nghiêng theo con quay hồi chuyển như cửa sổ VR
-    if (gyroActive) {
+    // (GSAP đang giữ transform của .card khi cuộn → nhường quyền cho nó)
+    if (gyroActive && !document.documentElement.classList.contains('js-gsap')) {
         $('card').style.transform =
             `perspective(1000px) rotateY(${(cam.ry * 12).toFixed(2)}deg) rotateX(${(-cam.rx * 9).toFixed(2)}deg)`;
+    }
+
+    // ── Lớp WebGL: cùng một camera ảo, cùng một nhịp khung hình ──
+    if (window.Stage3D) {
+        window.Stage3D.look(cam.rx, cam.ry);
+        window.Stage3D.render(dt, ts / 1000, warp);
     }
 
     requestAnimationFrame(loop);
@@ -1124,6 +1158,7 @@ function buildTimeline() {
         ol.appendChild(li);
     });
 
+    if (document.documentElement.classList.contains('js-gsap')) return;   // GSAP lo phần này
     const io = new IntersectionObserver((es) => {
         es.forEach(e => { if (e.isIntersecting) e.target.classList.add('show'); });
     }, { threshold: .3 });
@@ -1298,7 +1333,10 @@ function sparkTrail(e) {
     setTimeout(() => s.remove(), 900);
 }
 
+/* Reveal khi cuộn. Nếu choreo.js (GSAP) đã lên, nhường hẳn quyền cho nó —
+   hai bên cùng ghi opacity/transform lên một phần tử thì sẽ giật. */
 function observePanels() {
+    if (document.documentElement.classList.contains('js-gsap')) return;
     const io = new IntersectionObserver((entries) => {
         entries.forEach(en => { if (en.isIntersecting) en.target.classList.add('visible'); });
     }, { threshold: .18 });
@@ -1332,6 +1370,7 @@ function applyTheme(name, silent = false) {
     document.documentElement.dataset.theme = name;
     $('themeToggle').textContent = THEME_META[name].icon;
     localStorage.setItem('bd-theme', name);
+    window.Stage3D?.setTheme(name);     // nhuộm lại cả thiên hà, trái tim, bụi vàng
     if (!silent) toast('Chế độ ' + THEME_META[name].label);
 }
 
@@ -1774,6 +1813,12 @@ function enterParty() {
     $('intro').classList.add('open');
     document.body.classList.remove('locked');
     warp = 36;                               // cú nhảy hyperspace xuyên trường sao
+
+    // Bật lớp WebGL, rồi dựng lại sao 2D với mật độ thưa cho khỏi chồng lớp
+    window.Stage3D?.start();
+    if (has3D()) buildStars();
+    document.dispatchEvent(new CustomEvent('party:start'));   // choreo.js đo lại mốc cuộn
+
     initGyro();
     celebrate();
     enableTilt();

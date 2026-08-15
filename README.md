@@ -4,14 +4,25 @@ Một trang web quà tặng sinh nhật dành riêng cho người yêu: hành tr
 
 ## 🚀 Chạy thử
 
-Mở thẳng `index.html` bằng trình duyệt là xong.
-
-Muốn dùng đầy đủ tính năng (micro thổi nến, con quay hồi chuyển trên điện thoại) thì chạy qua server:
+Trang cần chạy **qua một web server**, không mở thẳng bằng `file://` được nữa — lớp
+3D nạp Three.js dưới dạng ES module, mà trình duyệt chặn ES module trên `file://` vì
+lý do bảo mật (CORS).
 
 ```bash
 npx serve .
 # rồi mở http://localhost:3000
 ```
+
+Hoặc không cần Node:
+
+```bash
+python3 -m http.server 3000
+```
+
+Đem lên GitHub Pages / Netlify / Vercel thì chạy thẳng, không cần cấu hình gì.
+
+> Máy không có WebGL, hoặc mạng chặn CDN? Trang vẫn chạy — chỉ là quay về engine
+> hạt 2D như bản gốc. Không có màn hình trắng.
 
 ## ✨ Có gì bên trong
 
@@ -35,6 +46,22 @@ npx serve .
 - Lá thư tay viết dần trong phong bì mở được
 - Lý do yêu, lời hứa (thẻ lật 3D), dòng thời gian kỷ niệm, album ảnh
 - 3 giao diện: Đêm sao 🌙 · Dạ tiệc vàng ✨ · Tiệc pastel ☀️
+
+**Lớp 3D thật (WebGL):**
+
+- Thiên hà 14.000 hạt bay xuyên qua người xem, có chiều sâu và độ mờ theo khoảng cách
+- Trái tim dựng từ 9.000 đốm sáng theo phương trình tim 3D — đập theo nhịp nhạc,
+  chạm vào tên là nổ tung rồi tự ghép lại
+- Pháo hoa WebGL nổ song song với pháo hoa 2D, có hiệu ứng bloom nên sáng thật
+- Viên ngọc thuỷ tinh khúc xạ + vành đai kiểu sao Thổ, bồng bềnh ở lề trái
+- Cả thế giới 3D đổi màu theo giao diện đang chọn
+
+**Animation theo cuộn (GSAP ScrollTrigger):**
+
+- Camera 3D lùi dần và hạ xuống khi cuộn — trang càng đọc càng thấy không gian mở ra
+- Panel dựng lên từ mặt phẳng nghiêng, nội dung bên trong hiện so le
+- Dòng thời gian lật vào như trang sách, album ảnh lật 3D theo lưới
+- Nút bấm có từ tính, ảnh nảy nhẹ khi rê chuột
 
 ## ⚙️ Tùy chỉnh
 
@@ -86,9 +113,29 @@ Tham số hỗ trợ: `name`, `age`, `date`, `love`, `title`, `me`, `you`, `wish
 ```
 index.html    — khung trang, hành trình 5 màn, các mục nội dung
 style.css     — 3 giao diện, hiệu ứng 3D, responsive, hỗ trợ giảm chuyển động
-script.js     — CONFIG + toàn bộ engine (camera 3D, pháo hoa, âm thanh, hành trình)
+script.js     — CONFIG + engine hạt 2D (pháo hoa, âm thanh, hành trình) + vòng lặp chính
+stage3d.js    — lớp WebGL: thiên hà, trái tim hạt, pháo hoa 3D, bloom  (ES module)
+choreo.js     — lớp biên đạo: toàn bộ animation theo cuộn trang (GSAP ScrollTrigger)
 photos/       — ảnh kỷ niệm của hai đứa
 ```
+
+### Ba lớp rời nhau
+
+```
+CSS aurora   z0
+sao 2D       z1   ← script.js
+WebGL 3D     z2   ← stage3d.js   (thiên hà, trái tim, pháo hoa có bloom)
+nội dung     z5+  ← choreo.js điều khiển animation khi cuộn
+kim tuyến 2D z6   ← script.js, luôn nằm trên cùng
+```
+
+Ba lớp nhưng **chỉ có đúng một vòng `requestAnimationFrame`**: `loop()` trong
+`script.js` gọi nhờ `Stage3D.render()`. Hai render loop chạy song song sẽ tranh
+khung hình của nhau và làm giật.
+
+`stage3d.js` và `choreo.js` đều tự tắt êm nếu thiếu điều kiện (không có WebGL,
+CDN hỏng, người dùng bật giảm chuyển động) — `script.js` không bao giờ phụ thuộc
+vào chúng, chỉ gọi qua `window.Stage3D?.…`.
 
 ## 📱 Hỗ trợ
 

@@ -22,6 +22,16 @@
     <link rel="stylesheet" href="style.css">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎂</text></svg>">
+
+    <!-- Three.js — nạp qua import map để stage3d.js viết `import from 'three'` cho gọn -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.169.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.169.0/examples/jsm/"
+        }
+    }
+    </script>
 </head>
 
 <body class="locked">
@@ -118,6 +128,8 @@
         <span class="aurora-blob b3"></span>
     </div>
     <canvas id="bgCanvas" aria-hidden="true"></canvas>
+    <!-- Lớp WebGL: thiên hà, trái tim hạt, pháo hoa 3D + bloom (xem stage3d.js) -->
+    <canvas id="glCanvas" aria-hidden="true"></canvas>
     <div class="balloons-bg" id="balloonsBg" aria-hidden="true"></div>
     <canvas id="fxCanvas" aria-hidden="true"></canvas>
 
@@ -285,7 +297,14 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+    <!-- GSAP bản UMD: nạp trước để cả script.js (classic) lẫn stage3d.js (module) cùng dùng -->
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+
     <script src="script.js"></script>
+    <script src="choreo.js"></script>
+    <!-- type="module" nên chạy sau 2 script trên, và vẫn trước DOMContentLoaded -->
+    <script type="module" src="stage3d.js"></script>
 </body>
 
 </html>
